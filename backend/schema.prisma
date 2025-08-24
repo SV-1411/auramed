@@ -1,0 +1,397 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String   @unique
+  password  String
+  role      UserRole
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Profile relationships
+  patientProfile PatientProfile?
+  doctorProfile  DoctorProfile?
+  adminProfile   AdminProfile?
+
+  // Relationships
+  sentMessages     AIAgentMessage[] @relation("MessageSender")
+  receivedMessages AIAgentMessage[] @relation("MessageReceiver")
+  appointments     Appointment[]    @relation("PatientAppointments")
+  doctorAppointments Appointment[]  @relation("DoctorAppointments")
+  medicalRecords   MedicalRecord[]  @relation("PatientRecords")
+  doctorRecords    MedicalRecord[]  @relation("DoctorRecords")
+  payments         PaymentTransaction[]
+  videoConsultations VideoConsultation[] @relation("PatientConsultations")
+  doctorConsultations VideoConsultation[] @relation("DoctorConsultations")
+  healthInsights   HealthInsight[]
+  auditLogs        AuditLog[]
+
+  @@map("users")
+}
+
+model PatientProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime
+  gender           Gender
+  emergencyContact String
+  preferredLanguage String @default("en")
+  
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyMembers  FamilyMember[]
+  
+  @@map("patient_profiles")
+}
+
+model DoctorProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  firstName       String
+  lastName        String
+  licenseNumber   String   @unique
+  specialization  String[]
+  experience      Int
+  qualifications  String[]
+  consultationFee Float
+  languages       String[]
+  qualityScore    Float    @default(0)
+  isVerified      Boolean  @default(false)
+  
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  availabilitySlots AvailabilitySlot[]
+  qualityMetrics    DoctorQualityMetrics?
+  
+  @@map("doctor_profiles")
+}
+
+model AdminProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  firstName   String
+  lastName    String
+  department  String
+  permissions String[]
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("admin_profiles")
+}
+
+model FamilyMember {
+  id              String    @id @default(cuid())
+  patientId       String
+  name            String
+  relationship    String
+  dateOfBirth     DateTime
+  
+  patient         PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  medicalRecords  MedicalRecord[]
+  
+  @@map("family_members")
+}
+
+model MedicalRecord {
+  id               String      @id @default(cuid())
+  patientId        String
+  doctorId         String?
+  familyMemberId   String?
+  date             DateTime    @default(now())
+  symptoms         String[]
+  diagnosis        String
+  visitSummary     String
+  riskLevel        RiskLevel
+  riskScore        Int
+  riskFactors      String[]
+  aiRecommendation String
+  followUpRequired Boolean     @default(false)
+  followUpDate     DateTime?
+  
+  patient      User           @relation("PatientRecords", fields: [patientId], references: [id])
+  doctor       User?          @relation("DoctorRecords", fields: [doctorId], references: [id])
+  familyMember FamilyMember?  @relation(fields: [familyMemberId], references: [id])
+  prescriptions Prescription[]
+  
+  @@map("medical_records")
+}
+
+model Prescription {
+  id               String @id @default(cuid())
+  medicalRecordId  String
+  medicationName   String
+  genericName      String?
+  dosage           String
+  frequency        String
+  duration         String
+  instructions     String
+  warnings         String[]
+  interactions     String[]
+  
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+  
+  @@map("prescriptions")
+}
+
+model Appointment {
+  id              String            @id @default(cuid())
+  patientId       String
+  doctorId        String
+  scheduledAt     DateTime
+  duration        Int               @default(30)
+  type            AppointmentType
+  status          AppointmentStatus @default(SCHEDULED)
+  symptoms        String[]
+  riskLevel       RiskLevel
+  riskScore       Int
+  consultationNotes String?
+  paymentStatus   PaymentStatus     @default(PENDING)
+  paymentAmount   Float
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  patient           User                @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctor            User                @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  payments          PaymentTransaction[]
+  videoConsultation VideoConsultation?
+  
+  @@map("appointments")
+}
+
+model AvailabilitySlot {
+  id          String  @id @default(cuid())
+  doctorId    String
+  dayOfWeek   Int     // 0-6 (Sunday-Saturday)
+  startTime   String  // HH:MM format
+  endTime     String  // HH:MM format
+  isAvailable Boolean @default(true)
+  
+  doctor DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  
+  @@map("availability_slots")
+}
+
+model AIAgentMessage {
+  id          String      @id @default(cuid())
+  agentType   AgentType
+  fromUserId  String
+  toUserId    String?
+  content     String
+  messageType MessageType
+  metadata    Json?
+  isProcessed Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  
+  sender   User  @relation("MessageSender", fields: [fromUserId], references: [id])
+  receiver User? @relation("MessageReceiver", fields: [toUserId], references: [id])
+  
+  @@map("ai_agent_messages")
+}
+
+model PaymentTransaction {
+  id                  String        @id @default(cuid())
+  appointmentId       String
+  patientId           String
+  amount              Float
+  currency            String        @default("INR")
+  method              PaymentMethod
+  status              PaymentStatus @default(PENDING)
+  gatewayTransactionId String?
+  gatewayResponse     Json?
+  createdAt           DateTime      @default(now())
+  completedAt         DateTime?
+  
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  patient     User        @relation(fields: [patientId], references: [id])
+  
+  @@map("payment_transactions")
+}
+
+model VideoConsultation {
+  id            String                    @id @default(cuid())
+  appointmentId String                    @unique
+  roomId        String                    @unique
+  accessToken   String
+  status        VideoConsultationStatus   @default(WAITING)
+  startedAt     DateTime?
+  endedAt       DateTime?
+  recordingUrl  String?
+  patientId     String
+  doctorId      String
+  patientJoined Boolean                   @default(false)
+  doctorJoined  Boolean                   @default(false)
+  createdAt     DateTime                  @default(now())
+  
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  patient     User        @relation("PatientConsultations", fields: [patientId], references: [id])
+  doctor      User        @relation("DoctorConsultations", fields: [doctorId], references: [id])
+  
+  @@map("video_consultations")
+}
+
+model DoctorQualityMetrics {
+  id                   String   @id @default(cuid())
+  doctorId             String   @unique
+  totalConsultations   Int      @default(0)
+  averageRating        Float    @default(0)
+  diagnosticAccuracy   Float    @default(0)
+  responseTime         Float    @default(0)
+  followUpCompliance   Float    @default(0)
+  patientSatisfaction  Float    @default(0)
+  qualityScore         Float    @default(0)
+  lastUpdated          DateTime @updatedAt
+  
+  doctor DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  
+  @@map("doctor_quality_metrics")
+}
+
+model HealthInsight {
+  id             String      @id @default(cuid())
+  patientId      String
+  type           InsightType
+  title          String
+  description    String
+  severity       Severity
+  confidence     Float
+  actionRequired Boolean     @default(false)
+  isRead         Boolean     @default(false)
+  generatedAt    DateTime    @default(now())
+  
+  patient User @relation(fields: [patientId], references: [id])
+  
+  @@map("health_insights")
+}
+
+model SystemAlert {
+  id             String      @id @default(cuid())
+  type           AlertType
+  severity       Severity
+  title          String
+  description    String
+  affectedEntity String
+  entityId       String
+  isResolved     Boolean     @default(false)
+  assignedTo     String?
+  createdAt      DateTime    @default(now())
+  resolvedAt     DateTime?
+  
+  @@map("system_alerts")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  
+  user User? @relation(fields: [userId], references: [id])
+  
+  @@map("audit_logs")
+}
+
+// Enums
+enum UserRole {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AppointmentType {
+  VIDEO
+  CHAT
+  EMERGENCY
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+  DEFERRED
+}
+
+enum PaymentMethod {
+  CARD
+  WALLET
+  EMI
+  DEFERRED
+}
+
+enum AgentType {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum MessageType {
+  TEXT
+  SYMPTOM_ANALYSIS
+  APPOINTMENT_BOOKING
+  PRESCRIPTION
+  ALERT
+}
+
+enum VideoConsultationStatus {
+  WAITING
+  ACTIVE
+  ENDED
+}
+
+enum InsightType {
+  PREDICTION
+  TREND
+  ALERT
+  RECOMMENDATION
+}
+
+enum Severity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertType {
+  FRAUD_DETECTION
+  COMPLIANCE_VIOLATION
+  SYSTEM_ERROR
+  PERFORMANCE_ISSUE
+}

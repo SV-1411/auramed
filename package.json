@@ -1,0 +1,32 @@
+{
+  "name": "auramed-platform",
+  "version": "1.0.0",
+  "description": "AI-First Healthcare Platform with autonomous agents",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\" \"npm run ai-service:dev\"",
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:dev": "cd frontend && npm run dev",
+    "ai-service:dev": "cd ai-service && python -m uvicorn main:app --reload --port 8001",
+    "build": "npm run backend:build && npm run frontend:build",
+    "backend:build": "cd backend && npm run build",
+    "frontend:build": "cd frontend && npm run build",
+    "test": "npm run backend:test && npm run frontend:test",
+    "backend:test": "cd backend && npm test",
+    "frontend:test": "cd frontend && npm test",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "keywords": ["healthcare", "ai", "agents", "telemedicine", "symptom-checker"],
+  "author": "Shivansh Verma",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared"
+  ]
+}
