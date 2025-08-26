@@ -1,0 +1,315 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.NotificationService = void 0;
+const client_1 = require("@prisma/client");
+const logger_1 = require("../utils/logger");
+const nodemailer_1 = __importDefault(require("nodemailer"));
+const twilio_1 = __importDefault(require("twilio"));
+class NotificationService {
+    constructor() {
+        this.prisma = new client_1.PrismaClient();
+        this.setupEmailTransporter();
+        this.setupTwilioClient();
+    }
+    setupEmailTransporter() {
+        this.emailTransporter = nodemailer_1.default.createTransport({
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT || '587'),
+            secure: false,
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+            }
+        });
+    }
+    setupTwilioClient() {
+        if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+            this.twilioClient = (0, twilio_1.default)(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+        }
+    }
+    async sendAppointmentConfirmation(patientId, appointment) {
+        try {
+            const patient = await this.prisma.user.findUnique({
+                where: { id: patientId },
+                include: { patientProfile: true }
+            });
+            if (!patient) {
+                throw new Error('Patient not found');
+            }
+            const doctor = await this.prisma.user.findUnique({
+                where: { id: appointment.doctorId },
+                include: { doctorProfile: true }
+            });
+            const emailContent = this.generateAppointmentConfirmationEmail(patient, doctor, appointment);
+            // Send email notification
+            if (patient.email) {
+                await this.sendEmail(patient.email, 'Appointment Confirmation - AuraMed', emailContent);
+            }
+            // Send SMS notification
+            if (patient.phone) {
+                const smsContent = `AuraMed: Your appointment is confirmed for ${appointment.scheduledAt.toLocaleString()} with Dr. ${doctor?.doctorProfile?.firstName ?? ''} ${doctor?.doctorProfile?.lastName ?? ''}. Appointment ID: ${appointment.id}`;
+                await this.sendSMS(patient.phone, smsContent);
+            }
+            logger_1.logger.info(`Appointment confirmation sent to patient: ${patientId}`);
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to send appointment confirmation:', error);
+        }
+    }
+    async sendUrgentAppointmentAlert(patientId, appointment) {
+        try {
+            const patient = await this.prisma.user.findUnique({
+                where: { id: patientId },
+                include: { patientProfile: true }
+            });
+            if (!patient)
+                return;
+            const urgentMessage = `🚨 URGENT: Emergency consultation scheduled for ${appointment.scheduledAt.toLocaleString()}. Please join the video call immediately. Appointment ID: ${appointment.id}`;
+            // Send immediate notifications via all channels
+            if (patient.email) {
+                await this.sendEmail(patient.email, '🚨 URGENT: Emergency Consultation Scheduled', urgentMessage);
+            }
+            if (patient.phone) {
+                await this.sendSMS(patient.phone, urgentMessage);
+            }
+            // Send push notification if available
+            await this.sendPushNotification(patientId, 'Emergency Consultation', urgentMessage);
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to send urgent appointment alert:', error);
+        }
+    }
+    async notifyDoctorUrgentConsultation(doctorId, appointment) {
+        try {
+            const doctor = await this.prisma.user.findUnique({
+                where: { id: doctorId },
+                include: { doctorProfile: true }
+            });
+            if (!doctor)
+                return;
+            const patient = await this.prisma.user.findUnique({
+                where: { id: appointment.patientId },
+                include: { patientProfile: true }
+            });
+            const urgentMessage = `🚨 URGENT CONSULTATION: Patient ${patient?.patientProfile?.firstName} ${patient?.patientProfile?.lastName} needs immediate attention. Appointment scheduled for ${appointment.scheduledAt.toLocaleString()}. ID: ${appointment.id}`;
+            if (doctor.email) {
+                await this.sendEmail(doctor.email, '🚨 URGENT: Patient Consultation Required', urgentMessage);
+            }
+            if (doctor.phone) {
+                await this.sendSMS(doctor.phone, urgentMessage);
+            }
+            await this.sendPushNotification(doctorId, 'Urgent Consultation', urgentMessage);
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to notify doctor of urgent consultation:', error);
+        }
+    }
+    async sendAppointmentReminder(appointmentId) {
+        try {
+            const appointment = await this.prisma.appointment.findUnique({
+                where: { id: appointmentId },
+                include: {
+                    patient: { include: { patientProfile: true } },
+                    doctor: { include: { doctorProfile: true } }
+                }
+            });
+            if (!appointment)
+                return;
+            const reminderTime = new Date(appointment.scheduledAt.getTime() - 30 * 60 * 1000); // 30 minutes before
+            const now = new Date();
+            if (now >= reminderTime) {
+                const message = `Reminder: Your appointment with Dr. ${appointment.doctor.doctorProfile?.firstName} ${appointment.doctor.doctorProfile?.lastName} is in 30 minutes (${appointment.scheduledAt.toLocaleString()}). Please be ready to join the video call.`;
+                if (appointment.patient.email) {
+                    await this.sendEmail(appointment.patient.email, 'Appointment Reminder - AuraMed', message);
+                }
+                if (appointment.patient.phone) {
+                    await this.sendSMS(appointment.patient.phone, message);
+                }
+            }
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to send appointment reminder:', error);
+        }
+    }
+    async sendMedicationReminder(patientId, medicationName, dosage) {
+        try {
+            const patient = await this.prisma.user.findUnique({
+                where: { id: patientId },
+                include: { patientProfile: true }
+            });
+            if (!patient)
+                return;
+            const message = `💊 Medication Reminder: Time to take your ${medicationName} (${dosage}). Stay consistent with your treatment plan.`;
+            if (patient.phone) {
+                await this.sendSMS(patient.phone, message);
+            }
+            await this.sendPushNotification(patientId, 'Medication Reminder', message);
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to send medication reminder:', error);
+        }
+    }
+    async sendSystemAlert(userId, alertType, message) {
+        try {
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId }
+            });
+            if (!user)
+                return;
+            // Create system alert record with valid enums and required fields
+            const validAlertTypes = new Set([
+                client_1.AlertType.FRAUD_DETECTION,
+                client_1.AlertType.COMPLIANCE_VIOLATION,
+                client_1.AlertType.SYSTEM_ERROR,
+                client_1.AlertType.PERFORMANCE_ISSUE
+            ]);
+            const typeEnum = validAlertTypes.has(alertType)
+                ? alertType
+                : client_1.AlertType.SYSTEM_ERROR;
+            await this.prisma.systemAlert.create({
+                data: {
+                    type: typeEnum,
+                    severity: client_1.Severity.WARNING,
+                    title: `System Alert: ${alertType}`,
+                    description: message,
+                    affectedEntity: 'User',
+                    entityId: userId,
+                    isResolved: false
+                }
+            });
+            // Send notification
+            if (user.email) {
+                await this.sendEmail(user.email, `AuraMed System Alert: ${alertType}`, message);
+            }
+            await this.sendPushNotification(userId, 'System Alert', message);
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to send system alert:', error);
+        }
+    }
+    async sendEmail(to, subject, content) {
+        try {
+            await this.emailTransporter.sendMail({
+                from: process.env.SMTP_USER,
+                to,
+                subject,
+                html: this.formatEmailContent(content)
+            });
+            logger_1.logger.info(`Email sent to: ${to}`);
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to send email:', error);
+        }
+    }
+    async sendSMS(to, message) {
+        try {
+            if (!this.twilioClient) {
+                logger_1.logger.warn('Twilio not configured, skipping SMS');
+                return;
+            }
+            await this.twilioClient.messages.create({
+                body: message,
+                from: process.env.TWILIO_PHONE_NUMBER,
+                to: to
+            });
+            logger_1.logger.info(`SMS sent to: ${to}`);
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to send SMS:', error);
+        }
+    }
+    async sendPushNotification(userId, title, message) {
+        try {
+            // Push notification implementation would go here
+            // For now, just log the notification
+            logger_1.logger.info(`Push notification for user ${userId}: ${title} - ${message}`);
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to send push notification:', error);
+        }
+    }
+    async sendWhatsAppMessage(to, message) {
+        try {
+            // WhatsApp Business API implementation would go here
+            logger_1.logger.info(`WhatsApp message to ${to}: ${message}`);
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to send WhatsApp message:', error);
+        }
+    }
+    generateAppointmentConfirmationEmail(patient, doctor, appointment) {
+        return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Appointment Confirmation</h2>
+        
+        <p>Dear ${patient.patientProfile?.firstName ?? patient.email},</p>
+        
+        <p>Your appointment has been successfully scheduled with AuraMed.</p>
+        
+        <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="margin-top: 0;">Appointment Details</h3>
+          <p><strong>Appointment ID:</strong> ${appointment.id}</p>
+          <p><strong>Date & Time:</strong> ${appointment.scheduledAt.toLocaleString()}</p>
+          <p><strong>Doctor:</strong> Dr. ${doctor?.doctorProfile?.firstName} ${doctor?.doctorProfile?.lastName}</p>
+          <p><strong>Duration:</strong> ${appointment.duration} minutes</p>
+          <p><strong>Type:</strong> ${appointment.type}</p>
+        </div>
+        
+        <p><strong>Important Notes:</strong></p>
+        <ul>
+          <li>Please join the video call 5 minutes before your scheduled time</li>
+          <li>Ensure you have a stable internet connection</li>
+          <li>Have your medical history and current medications ready</li>
+          <li>You will receive a reminder 30 minutes before your appointment</li>
+        </ul>
+        
+        <p>If you need to reschedule or cancel, please contact us at least 2 hours before your appointment.</p>
+        
+        <p>Best regards,<br>AuraMed Team</p>
+      </div>
+    `;
+    }
+    formatEmailContent(content) {
+        return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #2563eb;">AuraMed</h1>
+          <p style="color: #6b7280;">AI-Powered Healthcare Platform</p>
+        </div>
+        
+        <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          ${content.replace(/\n/g, '<br>')}
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px; color: #6b7280; font-size: 12px;">
+          <p>This is an automated message from AuraMed. Please do not reply to this email.</p>
+        </div>
+      </div>
+    `;
+    }
+    async scheduleReminders() {
+        try {
+            // Get appointments in the next hour that need reminders
+            const upcomingAppointments = await this.prisma.appointment.findMany({
+                where: {
+                    scheduledAt: {
+                        gte: new Date(),
+                        lte: new Date(Date.now() + 60 * 60 * 1000) // Next hour
+                    },
+                    status: client_1.AppointmentStatus.SCHEDULED
+                }
+            });
+            for (const appointment of upcomingAppointments) {
+                await this.sendAppointmentReminder(appointment.id);
+            }
+        }
+        catch (error) {
+            logger_1.logger.error('Failed to schedule reminders:', error);
+        }
+    }
+}
+exports.NotificationService = NotificationService;
+//# sourceMappingURL=NotificationService.js.map

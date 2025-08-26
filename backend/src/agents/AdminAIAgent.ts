@@ -1,5 +1,6 @@
 import { AIAgentMessage, SystemAlert, DoctorQualityMetrics, User } from '../../../shared/types';
 import { logger } from '../utils/logger';
+import { PrismaClient, UserRole } from '@prisma/client';
 import { OpenAIService } from '../services/OpenAIService';
 import { UserService } from '../services/UserService';
 import { AuditService } from '../services/AuditService';
@@ -12,6 +13,7 @@ export class AdminAIAgent {
   private auditService: AuditService;
   private fraudDetection: FraudDetectionService;
   private complianceService: ComplianceService;
+  private prisma: PrismaClient;
 
   constructor() {
     this.openAI = new OpenAIService();
@@ -19,6 +21,7 @@ export class AdminAIAgent {
     this.auditService = new AuditService();
     this.fraudDetection = new FraudDetectionService();
     this.complianceService = new ComplianceService();
+    this.prisma = new PrismaClient();
   }
 
   async processMessage(message: AIAgentMessage): Promise<AIAgentMessage> {
@@ -42,11 +45,14 @@ export class AdminAIAgent {
   async verifyDoctorCredentials(doctorId: string): Promise<{ verified: boolean; issues: string[] }> {
     try {
       const doctor = await this.userService.getUserById(doctorId);
-      if (!doctor || doctor.role !== 'doctor') {
+      if (!doctor || doctor.role !== UserRole.DOCTOR) {
         return { verified: false, issues: ['Doctor not found'] };
       }
-
-      const profile = doctor.profile as any; // DoctorProfile
+      // Fetch DoctorProfile from DB to ensure we have correct schema-aligned fields
+      const profile = await this.prisma.doctorProfile.findUnique({ where: { userId: doctorId } });
+      if (!profile) {
+        return { verified: false, issues: ['Doctor profile not found'] };
+      }
       const issues: string[] = [];
 
       // Check license number format and validity

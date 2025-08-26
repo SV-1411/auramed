@@ -1,4 +1,4 @@
-import { PrismaClient, User, Role } from '@prisma/client';
+import { PrismaClient, User, UserRole } from '@prisma/client';
 import { logger } from '../utils/logger';
 
 export class UserService {
@@ -13,9 +13,13 @@ export class UserService {
       return await this.prisma.user.findUnique({
         where: { id: userId },
         include: {
-          profile: true,
+          patientProfile: true,
+          doctorProfile: true,
+          adminProfile: true,
           appointments: true,
-          medicalRecords: true
+          doctorAppointments: true,
+          medicalRecords: true,
+          doctorRecords: true
         }
       });
     } catch (error) {
@@ -29,7 +33,9 @@ export class UserService {
       return await this.prisma.user.findUnique({
         where: { email },
         include: {
-          profile: true
+          patientProfile: true,
+          doctorProfile: true,
+          adminProfile: true
         }
       });
     } catch (error) {
@@ -41,10 +47,10 @@ export class UserService {
   async getAllDoctors(): Promise<User[]> {
     try {
       return await this.prisma.user.findMany({
-        where: { role: 'DOCTOR' },
+        where: { role: UserRole.DOCTOR },
         include: {
-          profile: true,
-          appointments: true
+          doctorProfile: true,
+          doctorAppointments: true
         }
       });
     } catch (error) {
@@ -58,7 +64,7 @@ export class UserService {
       await this.prisma.user.update({
         where: { id: doctorId },
         data: {
-          profile: {
+          doctorProfile: {
             update: {
               qualityScore: qualityScore
             }
@@ -75,22 +81,16 @@ export class UserService {
   async createUser(userData: {
     email: string;
     password: string;
-    firstName: string;
-    lastName: string;
-    role: Role;
-    phoneNumber?: string;
+    role: UserRole;
+    phone: string;
   }): Promise<User> {
     try {
       return await this.prisma.user.create({
         data: {
           email: userData.email,
           password: userData.password,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
           role: userData.role,
-          phoneNumber: userData.phoneNumber,
-          isActive: true,
-          emailVerified: false
+          phone: userData.phone
         }
       });
     } catch (error) {
@@ -128,7 +128,11 @@ export class UserService {
     try {
       const user = await this.prisma.user.findUnique({
         where: { email },
-        include: { profile: true }
+        include: {
+          patientProfile: true,
+          doctorProfile: true,
+          adminProfile: true
+        }
       });
 
       if (!user || !user.isActive) {
@@ -148,11 +152,15 @@ export class UserService {
     }
   }
 
-  async getUsersByRole(role: Role): Promise<User[]> {
+  async getUsersByRole(role: UserRole): Promise<User[]> {
     try {
       return await this.prisma.user.findMany({
         where: { role, isActive: true },
-        include: { profile: true }
+        include: {
+          patientProfile: true,
+          doctorProfile: true,
+          adminProfile: true
+        }
       });
     } catch (error) {
       logger.error('Error fetching users by role:', error);

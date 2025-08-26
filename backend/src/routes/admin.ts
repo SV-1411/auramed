@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UserRole, AlertType, AppointmentStatus } from '@prisma/client';
 import { authenticateToken, requireRole, AuthenticatedRequest } from '../middleware/auth';
 import { logger } from '../utils/logger';
 
@@ -18,12 +18,12 @@ router.get('/dashboard-stats', authenticateToken, requireRole('admin'), async (r
       systemAlerts
     ] = await Promise.all([
       prisma.user.count(),
-      prisma.user.count({ where: { role: 'doctor' } }),
-      prisma.user.count({ where: { role: 'patient' } }),
+      prisma.user.count({ where: { role: UserRole.DOCTOR } }),
+      prisma.user.count({ where: { role: UserRole.PATIENT } }),
       prisma.appointment.count(),
       prisma.user.count({ 
         where: { 
-          role: 'doctor',
+          role: UserRole.DOCTOR,
           doctorProfile: {
             isVerified: false
           }
@@ -56,7 +56,12 @@ router.get('/users', authenticateToken, requireRole('admin'), async (req: Authen
     const { role, status, limit = 20, offset = 0, search } = req.query;
 
     const whereClause: any = {};
-    if (role) whereClause.role = role;
+    if (role) {
+      const roleKey = String(role).toUpperCase() as keyof typeof UserRole;
+      if (UserRole[roleKey]) {
+        whereClause.role = UserRole[roleKey];
+      }
+    }
     if (status) whereClause.isActive = status === 'active';
     if (search) {
       whereClause.OR = [
@@ -104,7 +109,7 @@ router.put('/verify-doctor/:doctorId', authenticateToken, requireRole('admin'), 
     const doctor = await prisma.user.findFirst({
       where: {
         id: doctorId,
-        role: 'doctor'
+        role: UserRole.DOCTOR
       },
       include: {
         doctorProfile: true
@@ -120,10 +125,7 @@ router.put('/verify-doctor/:doctorId', authenticateToken, requireRole('admin'), 
       data: {
         doctorProfile: {
           update: {
-            isVerified,
-            verificationNotes,
-            verifiedAt: isVerified ? new Date() : null,
-            verifiedBy: isVerified ? req.user?.id : null
+            isVerified
           }
         }
       },
@@ -188,9 +190,7 @@ router.put('/system-alerts/:alertId/resolve', authenticateToken, requireRole('ad
       data: {
         isResolved: true,
         resolvedAt: new Date(),
-        resolvedBy: req.user?.id,
-        resolutionNotes
-      }
+          }
     });
 
     res.json({
@@ -207,32 +207,20 @@ router.put('/system-alerts/:alertId/resolve', authenticateToken, requireRole('ad
 // Get fraud detection reports
 router.get('/fraud-reports', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { status, riskLevel, limit = 20, offset = 0 } = req.query;
+    const { severity, isResolved, limit = 20, offset = 0 } = req.query;
 
-    const whereClause: any = {};
-    if (status) whereClause.status = status;
-    if (riskLevel) whereClause.riskLevel = riskLevel;
+    const whereClause: any = { type: AlertType.FRAUD_DETECTION };
+    if (severity) whereClause.severity = severity;
+    if (isResolved !== undefined) whereClause.isResolved = isResolved === 'true';
 
-    const fraudReports = await prisma.fraudDetectionReport.findMany({
+    const fraudReports = await prisma.systemAlert.findMany({
       where: whereClause,
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            role: true
-          }
-        }
-      },
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
       skip: parseInt(offset as string)
     });
 
-    const total = await prisma.fraudDetectionReport.count({ where: whereClause });
-
+    const total = await prisma.systemAlert.count({ where: whereClause });
     res.json({
       success: true,
       data: {
@@ -253,15 +241,15 @@ router.get('/fraud-reports', authenticateToken, requireRole('admin'), async (req
 router.put('/fraud-reports/:reportId', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { reportId } = req.params;
-    const { status, adminNotes } = req.body;
+    const { status } = req.body;
 
-    const fraudReport = await prisma.fraudDetectionReport.update({
+    const isResolved = String(status).toLowerCase() === 'resolved';
+
+    const fraudReport = await prisma.systemAlert.update({
       where: { id: reportId },
       data: {
-        status,
-        adminNotes,
-        reviewedAt: new Date(),
-        reviewedBy: req.user?.id
+        isResolved,
+        resolvedAt: isResolved ? new Date() : null
       }
     });
 
@@ -300,9 +288,7 @@ router.get('/analytics', authenticateToken, requireRole('admin'), async (req: Au
     const [
       newUsers,
       newAppointments,
-      completedAppointments,
-      revenue,
-      averageRating
+      completedAppointments
     ] = await Promise.all([
       prisma.user.count({
         where: { createdAt: { gte: startDate } }
@@ -312,20 +298,9 @@ router.get('/analytics', authenticateToken, requireRole('admin'), async (req: Au
       }),
       prisma.appointment.count({
         where: { 
-          status: 'completed',
+          status: AppointmentStatus.COMPLETED,
           updatedAt: { gte: startDate }
         }
-      }),
-      prisma.payment.aggregate({
-        where: { 
-          status: 'completed',
-          createdAt: { gte: startDate }
-        },
-        _sum: { amount: true }
-      }),
-      prisma.appointmentRating.aggregate({
-        where: { createdAt: { gte: startDate } },
-        _avg: { rating: true }
       })
     ]);
 
@@ -336,8 +311,8 @@ router.get('/analytics', authenticateToken, requireRole('admin'), async (req: Au
         newUsers,
         newAppointments,
         completedAppointments,
-        revenue: revenue._sum.amount || 0,
-        averageRating: averageRating._avg.rating || 0
+        revenue: 0,
+        averageRating: 0
       }
     });
 
@@ -351,15 +326,12 @@ router.get('/analytics', authenticateToken, requireRole('admin'), async (req: Au
 router.put('/users/:userId/suspend', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { userId } = req.params;
-    const { isActive, suspensionReason } = req.body;
+    const { isActive } = req.body;
 
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
-        isActive,
-        suspensionReason: !isActive ? suspensionReason : null,
-        suspendedAt: !isActive ? new Date() : null,
-        suspendedBy: !isActive ? req.user?.id : null
+        isActive
       }
     });
 

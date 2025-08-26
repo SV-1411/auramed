@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, AppointmentStatus } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
 
@@ -11,21 +11,18 @@ router.get('/profile', authenticateToken, async (req: Request, res: Response) =>
   try {
     const userId = req.user?.id;
 
-    const patient = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        patientProfile: true,
-        familyMembers: true
-      }
+    const profile = await prisma.patientProfile.findUnique({
+      where: { userId },
+      include: { familyMembers: true }
     });
 
-    if (!patient) {
+    if (!profile) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
     res.json({
       success: true,
-      data: patient
+      data: profile
     });
 
   } catch (error) {
@@ -38,44 +35,32 @@ router.get('/profile', authenticateToken, async (req: Request, res: Response) =>
 router.put('/profile', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { firstName, lastName, dateOfBirth, gender, phoneNumber, address, emergencyContact, medicalHistory, allergies } = req.body;
+    const { firstName, lastName, dateOfBirth, gender, emergencyContact, preferredLanguage } = req.body;
 
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
+    const updated = await prisma.patientProfile.upsert({
+      where: { userId },
+      update: {
         firstName,
         lastName,
-        patientProfile: {
-          upsert: {
-            create: {
-              dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
-              gender,
-              phoneNumber,
-              address,
-              emergencyContact,
-              medicalHistory: medicalHistory || [],
-              allergies: allergies || []
-            },
-            update: {
-              dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
-              gender,
-              phoneNumber,
-              address,
-              emergencyContact,
-              medicalHistory: medicalHistory || [],
-              allergies: allergies || []
-            }
-          }
-        }
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+        gender,
+        emergencyContact,
+        preferredLanguage
       },
-      include: {
-        patientProfile: true
+      create: {
+        userId: userId!,
+        firstName,
+        lastName,
+        dateOfBirth: new Date(dateOfBirth),
+        gender,
+        emergencyContact,
+        preferredLanguage: preferredLanguage || 'en'
       }
     });
 
     res.json({
       success: true,
-      data: updatedUser
+      data: updated
     });
 
   } catch (error) {
@@ -92,7 +77,8 @@ router.get('/appointments', authenticateToken, async (req: Request, res: Respons
 
     const whereClause: any = { patientId: userId };
     if (status) {
-      whereClause.status = status;
+      const st = String(status).toUpperCase() as keyof typeof AppointmentStatus;
+      if (AppointmentStatus[st]) whereClause.status = AppointmentStatus[st];
     }
 
     const appointments = await prisma.appointment.findMany({
@@ -143,7 +129,7 @@ router.get('/medical-records', authenticateToken, async (req: Request, res: Resp
           }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { date: 'desc' }
     });
 
     res.json({
@@ -163,15 +149,15 @@ router.get('/prescriptions', authenticateToken, async (req: Request, res: Respon
     const userId = req.user?.id;
 
     const prescriptions = await prisma.prescription.findMany({
-      where: { patientId: userId },
+      where: { medicalRecord: { patientId: userId } },
       include: {
-        doctor: {
+        medicalRecord: {
           include: {
-            doctorProfile: true
+            doctor: { include: { doctorProfile: true } }
           }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { medicalRecord: { date: 'desc' } }
     });
 
     res.json({
@@ -193,7 +179,7 @@ router.get('/health-insights', authenticateToken, async (req: Request, res: Resp
 
     const insights = await prisma.healthInsight.findMany({
       where: { patientId: userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { generatedAt: 'desc' },
       take: parseInt(limit as string)
     });
 

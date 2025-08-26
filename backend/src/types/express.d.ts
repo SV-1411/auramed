@@ -3,6 +3,7 @@ declare global {
   namespace Express {
     interface UserPayload {
       id: string;
+      userId: string; // duplicate of id for convenience across codebase
       role: string;
     }
 

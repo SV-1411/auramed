@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, AppointmentStatus, Severity, AlertType } from '@prisma/client';
 import { logger } from '../utils/logger';
 import nodemailer, { Transporter } from 'nodemailer';
 import twilio from 'twilio';
@@ -21,8 +21,8 @@ interface NotificationPreferences {
 
 export class NotificationService {
   private prisma: PrismaClient;
-  private emailTransporter: Transporter;
-  private twilioClient: any;
+  private emailTransporter!: Transporter;
+  private twilioClient?: any;
 
   constructor() {
     this.prisma = new PrismaClient();
@@ -79,9 +79,9 @@ export class NotificationService {
       }
 
       // Send SMS notification
-      if (patient.patientProfile?.phoneNumber) {
-        const smsContent = `AuraMed: Your appointment is confirmed for ${appointment.scheduledAt.toLocaleString()} with Dr. ${doctor?.doctorProfile?.firstName} ${doctor?.doctorProfile?.lastName}. Appointment ID: ${appointment.id}`;
-        await this.sendSMS(patient.patientProfile.phoneNumber, smsContent);
+      if (patient.phone) {
+        const smsContent = `AuraMed: Your appointment is confirmed for ${appointment.scheduledAt.toLocaleString()} with Dr. ${doctor?.doctorProfile?.firstName ?? ''} ${doctor?.doctorProfile?.lastName ?? ''}. Appointment ID: ${appointment.id}`;
+        await this.sendSMS(patient.phone, smsContent);
       }
 
       logger.info(`Appointment confirmation sent to patient: ${patientId}`);
@@ -111,8 +111,8 @@ export class NotificationService {
         );
       }
 
-      if (patient.patientProfile?.phoneNumber) {
-        await this.sendSMS(patient.patientProfile.phoneNumber, urgentMessage);
+      if (patient.phone) {
+        await this.sendSMS(patient.phone, urgentMessage);
       }
 
       // Send push notification if available
@@ -147,8 +147,8 @@ export class NotificationService {
         );
       }
 
-      if (doctor.doctorProfile?.phoneNumber) {
-        await this.sendSMS(doctor.doctorProfile.phoneNumber, urgentMessage);
+      if (doctor.phone) {
+        await this.sendSMS(doctor.phone, urgentMessage);
       }
 
       await this.sendPushNotification(doctorId, 'Urgent Consultation', urgentMessage);
@@ -184,8 +184,8 @@ export class NotificationService {
           );
         }
 
-        if (appointment.patient.patientProfile?.phoneNumber) {
-          await this.sendSMS(appointment.patient.patientProfile.phoneNumber, message);
+        if (appointment.patient.phone) {
+          await this.sendSMS(appointment.patient.phone, message);
         }
       }
 
@@ -205,8 +205,8 @@ export class NotificationService {
 
       const message = `💊 Medication Reminder: Time to take your ${medicationName} (${dosage}). Stay consistent with your treatment plan.`;
 
-      if (patient.patientProfile?.phoneNumber) {
-        await this.sendSMS(patient.patientProfile.phoneNumber, message);
+      if (patient.phone) {
+        await this.sendSMS(patient.phone, message);
       }
 
       await this.sendPushNotification(patientId, 'Medication Reminder', message);
@@ -224,14 +224,25 @@ export class NotificationService {
 
       if (!user) return;
 
-      // Create system alert record
+      // Create system alert record with valid enums and required fields
+      const validAlertTypes = new Set<AlertType>([
+        AlertType.FRAUD_DETECTION,
+        AlertType.COMPLIANCE_VIOLATION,
+        AlertType.SYSTEM_ERROR,
+        AlertType.PERFORMANCE_ISSUE
+      ]);
+      const typeEnum: AlertType = validAlertTypes.has(alertType as unknown as AlertType)
+        ? (alertType as unknown as AlertType)
+        : AlertType.SYSTEM_ERROR;
+
       await this.prisma.systemAlert.create({
         data: {
-          type: alertType,
-          severity: 'medium',
+          type: typeEnum,
+          severity: Severity.WARNING,
           title: `System Alert: ${alertType}`,
           description: message,
-          userId: userId,
+          affectedEntity: 'User',
+          entityId: userId,
           isResolved: false
         }
       });
@@ -299,6 +310,29 @@ export class NotificationService {
     }
   }
 
+  // Schedules and notifies a follow-up reminder for a given patient and doctor
+  public async scheduleFollowUpReminder(patientId: string, doctorId: string, followUpDate: Date): Promise<void> {
+    try {
+      const patient = await this.prisma.user.findUnique({ where: { id: patientId } });
+      const doctor = await this.prisma.user.findUnique({ where: { id: doctorId } });
+
+      const msg = `Your follow-up appointment is scheduled for ${followUpDate.toLocaleString()}.`;
+
+      if (patient?.email) {
+        await this.sendEmail(patient.email, 'Follow-up Reminder Scheduled - AuraMed', msg);
+      }
+      if (patient?.phone) {
+        await this.sendSMS(patient.phone, msg);
+      }
+
+      await this.sendPushNotification(patientId, 'Follow-up Reminder Scheduled', msg);
+
+      logger.info(`Scheduled follow-up reminder for patient ${patientId} with doctor ${doctorId} on ${followUpDate.toISOString()}`);
+    } catch (error) {
+      logger.error('Failed to schedule follow-up reminder:', error);
+    }
+  }
+
   private async sendWhatsAppMessage(to: string, message: string): Promise<void> {
     try {
       // WhatsApp Business API implementation would go here
@@ -314,7 +348,7 @@ export class NotificationService {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #2563eb;">Appointment Confirmation</h2>
         
-        <p>Dear ${patient.patientProfile?.firstName || patient.firstName},</p>
+        <p>Dear ${patient.patientProfile?.firstName ?? patient.email},</p>
         
         <p>Your appointment has been successfully scheduled with AuraMed.</p>
         
@@ -370,7 +404,7 @@ export class NotificationService {
             gte: new Date(),
             lte: new Date(Date.now() + 60 * 60 * 1000) // Next hour
           },
-          status: 'scheduled'
+          status: AppointmentStatus.SCHEDULED
         }
       });
 

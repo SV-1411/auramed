@@ -1,5 +1,5 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, AppointmentType, RiskLevel } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
 
@@ -9,19 +9,26 @@ const prisma = new PrismaClient();
 // Add family member
 router.post('/add-member', authenticateToken, async (req, res) => {
   try {
-    const { firstName, lastName, relationship, dateOfBirth, gender, phoneNumber, medicalConditions } = req.body;
+    const { firstName, lastName, name, relationship, dateOfBirth } = req.body;
     const userId = req.user?.id;
+
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    if (!relationship || !dateOfBirth || (!name && (!firstName || !lastName))) {
+      return res.status(400).json({ error: 'firstName/lastName or name, relationship and dateOfBirth are required' });
+    }
+
+    const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
+    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
+
+    const fullName = name || `${firstName} ${lastName}`.trim();
 
     const familyMember = await prisma.familyMember.create({
       data: {
-        primaryUserId: userId!,
-        firstName,
-        lastName,
+        patientId: patientProfile.id,
+        name: fullName,
         relationship,
-        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
-        gender,
-        phoneNumber,
-        medicalConditions: medicalConditions || []
+        dateOfBirth: new Date(dateOfBirth)
       }
     });
 
@@ -40,10 +47,13 @@ router.post('/add-member', authenticateToken, async (req, res) => {
 router.get('/members', authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
+    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
 
     const familyMembers = await prisma.familyMember.findMany({
-      where: { primaryUserId: userId },
-      orderBy: { createdAt: 'desc' }
+      where: { patientId: patientProfile.id }
     });
 
     res.json({
@@ -65,10 +75,14 @@ router.put('/member/:memberId', authenticateToken, async (req, res) => {
     const updateData = req.body;
 
     // Verify family member belongs to user
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
+    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
+
     const familyMember = await prisma.familyMember.findFirst({
       where: {
         id: memberId,
-        primaryUserId: userId
+        patientId: patientProfile.id
       }
     });
 
@@ -79,7 +93,8 @@ router.put('/member/:memberId', authenticateToken, async (req, res) => {
     const updatedMember = await prisma.familyMember.update({
       where: { id: memberId },
       data: {
-        ...updateData,
+        name: updateData.name || (updateData.firstName && updateData.lastName ? `${updateData.firstName} ${updateData.lastName}`.trim() : undefined),
+        relationship: updateData.relationship,
         dateOfBirth: updateData.dateOfBirth ? new Date(updateData.dateOfBirth) : undefined
       }
     });
@@ -102,10 +117,14 @@ router.delete('/member/:memberId', authenticateToken, async (req, res) => {
     const userId = req.user?.id;
 
     // Verify family member belongs to user
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
+    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
+
     const familyMember = await prisma.familyMember.findFirst({
       where: {
         id: memberId,
-        primaryUserId: userId
+        patientId: patientProfile.id
       }
     });
 
@@ -136,10 +155,14 @@ router.post('/member/:memberId/appointment', authenticateToken, async (req, res)
     const userId = req.user?.id;
 
     // Verify family member belongs to user
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
+    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
+
     const familyMember = await prisma.familyMember.findFirst({
       where: {
         id: memberId,
-        primaryUserId: userId
+        patientId: patientProfile.id
       }
     });
 
@@ -153,12 +176,12 @@ router.post('/member/:memberId/appointment', authenticateToken, async (req, res)
         doctorId,
         scheduledAt: new Date(scheduledAt),
         duration: 30,
-        type: 'video',
+        type: AppointmentType.VIDEO,
         symptoms: symptoms || [],
-        notes: `Appointment for family member: ${familyMember.firstName} ${familyMember.lastName} (${familyMember.relationship}). ${notes || ''}`,
-        paymentStatus: 'pending',
-        paymentAmount: 500,
-        familyMemberId: memberId
+        consultationNotes: `Appointment for family member: ${familyMember.name} (${familyMember.relationship}). ${notes || ''}`,
+        riskLevel: RiskLevel.LOW,
+        riskScore: 0,
+        paymentAmount: 500
       }
     });
 

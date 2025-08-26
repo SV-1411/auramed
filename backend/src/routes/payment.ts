@@ -1,5 +1,5 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, PaymentStatus, UserRole } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { PaymentService } from '../services/PaymentService';
 import { logger } from '../utils/logger';
@@ -39,7 +39,7 @@ router.post('/process', authenticateToken, async (req, res) => {
       // Update appointment payment status
       await prisma.appointment.update({
         where: { id: appointmentId },
-        data: { paymentStatus: 'completed' }
+        data: { paymentStatus: PaymentStatus.PAID }
       });
     }
 
@@ -108,7 +108,7 @@ router.post('/refund/:paymentId', authenticateToken, async (req, res) => {
     const { amount } = req.body;
 
     // Only doctors and admins can process refunds
-    if (req.user?.role !== 'doctor' && req.user?.role !== 'admin') {
+    if (req.user?.role !== UserRole.DOCTOR && req.user?.role !== UserRole.ADMIN) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 

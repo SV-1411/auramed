@@ -300,4 +300,15 @@ export class MedicalRecordService {
       return false;
     }
   }
+
+  // Placeholder to support DoctorAIAgent metrics update without schema coupling
+  async updateDoctorMetrics(doctorId: string, metrics: Partial<any>): Promise<void> {
+    try {
+      // If a DoctorQualityMetrics model exists, you can implement an upsert here.
+      // For now, just log the metrics update intent.
+      logger.info(`updateDoctorMetrics called for doctor ${doctorId}: ${JSON.stringify(metrics)}`);
+    } catch (error) {
+      logger.error('Error updating doctor metrics (stub):', error);
+    }
+  }
 }

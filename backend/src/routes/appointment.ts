@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import { getDatabase } from '../config/database';
 import { getRedis } from '../config/redis';
@@ -14,7 +14,7 @@ router.post('/', authenticateToken, [
   body('scheduledAt').isISO8601(),
   body('symptoms').isArray().notEmpty(),
   body('type').isIn(['VIDEO', 'CHAT', 'EMERGENCY'])
-], async (req, res, next) => {
+], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -95,7 +95,7 @@ router.post('/', authenticateToken, [
 });
 
 // Get appointments for user
-router.get('/', authenticateToken, async (req, res, next) => {
+router.get('/', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req as any).user.userId;
     const userRole = (req as any).user.role;
@@ -133,7 +133,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
 });
 
 // Get appointment by ID
-router.get('/:id', authenticateToken, async (req, res, next) => {
+router.get('/:id', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const appointmentId = req.params.id;
     const userId = (req as any).user.userId;
@@ -172,7 +172,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 // Update appointment status
 router.patch('/:id/status', authenticateToken, [
   body('status').isIn(['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'])
-], async (req, res, next) => {
+], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -224,7 +224,7 @@ router.patch('/:id/status', authenticateToken, [
 // Add consultation notes (Doctor only)
 router.patch('/:id/notes', authenticateToken, requireRole(['DOCTOR']), [
   body('consultationNotes').isString().notEmpty()
-], async (req, res, next) => {
+], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -267,7 +267,7 @@ router.patch('/:id/notes', authenticateToken, requireRole(['DOCTOR']), [
 });
 
 // Get available doctors
-router.get('/doctors/available', authenticateToken, async (req, res, next) => {
+router.get('/doctors/available', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { specialization, date, time } = req.query;
     const db = getDatabase();
@@ -335,7 +335,7 @@ router.get('/doctors/available', authenticateToken, async (req, res, next) => {
 });
 
 // Get emergency queue (Admin/Doctor only)
-router.get('/emergency/queue', authenticateToken, requireRole(['ADMIN', 'DOCTOR']), async (req, res, next) => {
+router.get('/emergency/queue', authenticateToken, requireRole(['ADMIN', 'DOCTOR']), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const redis = getRedis();
     const queueSize = await redis.getEmergencyQueueSize();

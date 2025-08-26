@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import { getDatabase } from '../config/database';
 import { getRedis } from '../config/redis';
@@ -21,7 +21,7 @@ router.post('/chat', authenticateToken, [
   body('message').notEmpty().trim(),
   body('messageType').optional().isIn(['text', 'symptom_analysis', 'appointment_booking', 'prescription', 'alert']),
   body('metadata').optional().isObject()
-], async (req, res, next) => {
+], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -111,7 +111,7 @@ router.post('/chat', authenticateToken, [
 });
 
 // Get chat history
-router.get('/chat/history', authenticateToken, async (req, res, next) => {
+router.get('/chat/history', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req as any).user.userId;
     const { limit = 50, offset = 0 } = req.query;
@@ -147,7 +147,7 @@ router.post('/analyze-symptoms', authenticateToken, [
   body('symptoms').isArray().notEmpty(),
   body('symptoms.*').isString().notEmpty(),
   body('patientHistory').optional().isObject()
-], async (req, res, next) => {
+], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -215,7 +215,7 @@ router.post('/analyze-symptoms', authenticateToken, [
 router.post('/consultation-summary', authenticateToken, [
   body('appointmentId').isString().notEmpty(),
   body('consultationNotes').isString().notEmpty()
-], async (req, res, next) => {
+], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -251,7 +251,7 @@ router.post('/consultation-summary', authenticateToken, [
 // Verify doctor credentials (Admin-specific endpoint)
 router.post('/verify-doctor', authenticateToken, [
   body('doctorId').isString().notEmpty()
-], async (req, res, next) => {
+], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -281,7 +281,7 @@ router.post('/verify-doctor', authenticateToken, [
 });
 
 // Get system alerts (Admin-specific endpoint)
-router.get('/system-alerts', authenticateToken, async (req, res, next) => {
+router.get('/system-alerts', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userRole = (req as any).user.role;
 
@@ -305,7 +305,7 @@ router.get('/system-alerts', authenticateToken, async (req, res, next) => {
 });
 
 // Detect fraud (Admin-specific endpoint)
-router.post('/detect-fraud', authenticateToken, async (req, res, next) => {
+router.post('/detect-fraud', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userRole = (req as any).user.role;
 
@@ -331,7 +331,7 @@ router.post('/detect-fraud', authenticateToken, async (req, res, next) => {
 });
 
 // Update doctor quality rankings (Admin-specific endpoint)
-router.post('/update-quality-rankings', authenticateToken, async (req, res, next) => {
+router.post('/update-quality-rankings', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userRole = (req as any).user.role;
 

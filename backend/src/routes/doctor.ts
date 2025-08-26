@@ -14,8 +14,11 @@ router.get('/profile', authenticateToken, requireRole('doctor'), async (req: Req
     const doctor = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        doctorProfile: true,
-        qualityMetrics: true
+        doctorProfile: {
+          include: {
+            qualityMetrics: true
+          }
+        }
       }
     });
 
@@ -38,31 +41,36 @@ router.get('/profile', authenticateToken, requireRole('doctor'), async (req: Req
 router.put('/profile', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { firstName, lastName, specialization, licenseNumber, experience, bio, consultationFee, availableHours } = req.body;
+    const { firstName, lastName, specialization, licenseNumber, experience, consultationFee } = req.body as {
+      firstName?: string;
+      lastName?: string;
+      specialization?: string[];
+      licenseNumber: string;
+      experience?: string;
+      consultationFee?: string;
+    };
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        firstName,
-        lastName,
         doctorProfile: {
           upsert: {
             create: {
+              firstName: firstName ?? '',
+              lastName: lastName ?? '',
               specialization: specialization || [],
               licenseNumber,
-              experience: experience ? parseInt(experience) : null,
-              bio,
-              consultationFee: consultationFee ? parseFloat(consultationFee) : null,
-              availableHours: availableHours || {},
+              experience: experience ? parseInt(experience) : 0,
+              consultationFee: consultationFee ? parseFloat(consultationFee) : 0,
               isVerified: false
             },
             update: {
+              firstName: firstName ?? undefined,
+              lastName: lastName ?? undefined,
               specialization: specialization || [],
               licenseNumber,
               experience: experience ? parseInt(experience) : undefined,
-              bio,
-              consultationFee: consultationFee ? parseFloat(consultationFee) : undefined,
-              availableHours: availableHours || {}
+              consultationFee: consultationFee ? parseFloat(consultationFee) : undefined
             }
           }
         }
@@ -174,13 +182,14 @@ router.get('/availability', authenticateToken, requireRole('doctor'), async (req
 router.post('/availability', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { startTime, endTime, isAvailable } = req.body;
+    const { startTime, endTime, dayOfWeek, isAvailable } = req.body;
 
     const availabilitySlot = await prisma.availabilitySlot.create({
       data: {
         doctorId: userId!,
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
+        dayOfWeek,
+        startTime,
+        endTime,
         isAvailable: isAvailable !== false
       }
     });
@@ -201,7 +210,12 @@ router.put('/availability/:slotId', authenticateToken, requireRole('doctor'), as
   try {
     const userId = req.user?.id;
     const { slotId } = req.params;
-    const { startTime, endTime, isAvailable } = req.body;
+    const { dayOfWeek, startTime, endTime, isAvailable } = req.body as {
+      dayOfWeek?: number;
+      startTime?: string;
+      endTime?: string;
+      isAvailable?: boolean;
+    };
 
     // Verify slot belongs to doctor
     const existingSlot = await prisma.availabilitySlot.findFirst({
@@ -218,8 +232,9 @@ router.put('/availability/:slotId', authenticateToken, requireRole('doctor'), as
     const updatedSlot = await prisma.availabilitySlot.update({
       where: { id: slotId },
       data: {
-        startTime: startTime ? new Date(startTime) : undefined,
-        endTime: endTime ? new Date(endTime) : undefined,
+        dayOfWeek: dayOfWeek ?? undefined,
+        startTime: startTime ?? undefined,
+        endTime: endTime ?? undefined,
         isAvailable
       }
     });
@@ -265,29 +280,19 @@ router.get('/quality-metrics', authenticateToken, requireRole('doctor'), async (
 router.post('/prescription', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { patientId, appointmentId, medications, instructions, diagnosis } = req.body;
+    const { medicalRecordId, medications, instructions, diagnosis } = req.body;
 
-    // Verify appointment belongs to doctor
-    const appointment = await prisma.appointment.findFirst({
-      where: {
-        id: appointmentId,
-        doctorId: userId
-      }
-    });
-
-    if (!appointment) {
-      return res.status(404).json({ error: 'Appointment not found' });
-    }
-
-    const prescription = await prisma.prescription.create({
+        const prescription = await prisma.prescription.create({
       data: {
-        patientId,
-        doctorId: userId!,
-        appointmentId,
-        medications: medications || [],
+        medicalRecordId,
+        medicationName: medications?.medicationName ?? '',
+        genericName: medications?.genericName,
+        dosage: medications?.dosage ?? '',
+        frequency: medications?.frequency ?? '',
+        duration: medications?.duration ?? '',
         instructions,
-        diagnosis,
-        issuedAt: new Date()
+        warnings: medications?.warnings || [],
+        interactions: medications?.interactions || []
       }
     });
 
@@ -306,17 +311,28 @@ router.post('/prescription', authenticateToken, requireRole('doctor'), async (re
 router.post('/medical-record', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { patientId, appointmentId, diagnosis, symptoms, treatment, notes, followUpRequired } = req.body;
+    const { patientId, appointmentId, treatment, notes, diagnosis, symptoms, visitSummary, followUpRequired } = req.body as {
+      patientId: string;
+      appointmentId?: string;
+      treatment?: string;
+      notes?: string;
+      diagnosis: string;
+      symptoms?: string[];
+      visitSummary?: string;
+      followUpRequired?: boolean;
+    };
 
     const medicalRecord = await prisma.medicalRecord.create({
       data: {
         patientId,
         doctorId: userId!,
-        appointmentId,
         diagnosis,
         symptoms: symptoms || [],
-        treatment,
-        notes,
+        visitSummary: visitSummary || treatment || notes || '',
+        aiRecommendation: notes || '',
+        riskLevel: 'LOW',
+        riskScore: 0,
+        riskFactors: [],
         followUpRequired: followUpRequired || false
       }
     });

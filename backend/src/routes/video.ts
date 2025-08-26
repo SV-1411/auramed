@@ -1,5 +1,5 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, VideoConsultationStatus, AppointmentStatus } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
 import twilio from 'twilio';
@@ -69,18 +69,17 @@ router.post('/create-room', authenticateToken, async (req, res) => {
     patientToken.addGrant(videoGrant);
     doctorToken.addGrant(videoGrant);
 
-    // Update appointment with video consultation details
+    // Update appointment with video consultation details (schema-aligned)
     await prisma.appointment.update({
       where: { id: appointmentId },
       data: {
         videoConsultation: {
           create: {
             roomId: room.sid,
-            roomName: room.uniqueName,
-            status: 'created',
-            patientToken: patientToken.toJwt(),
-            doctorToken: doctorToken.toJwt(),
-            createdAt: new Date()
+            accessToken: '',
+            status: VideoConsultationStatus.WAITING,
+            patientId: appointment.patientId,
+            doctorId: appointment.doctorId
           }
         }
       }
@@ -149,18 +148,29 @@ router.get('/join/:appointmentId', authenticateToken, async (req, res) => {
     await prisma.videoConsultation.update({
       where: { id: videoConsultation.id },
       data: { 
-        status: 'in_progress',
+        status: VideoConsultationStatus.ACTIVE,
         startedAt: new Date()
       }
     });
 
     const isPatient = userId === videoConsultation.appointment.patientId;
-    const token = isPatient ? videoConsultation.patientToken : videoConsultation.doctorToken;
+    // Generate a fresh access token on join (do not rely on stored tokens)
+    const AccessToken = twilio.jwt.AccessToken;
+    const VideoGrant = AccessToken.VideoGrant;
+    const grant = new VideoGrant({ room: `consultation_${appointmentId}` });
+    const joinToken = new AccessToken(
+      process.env.TWILIO_ACCOUNT_SID!,
+      process.env.TWILIO_API_KEY!,
+      process.env.TWILIO_API_SECRET!,
+      { identity: isPatient ? `patient_${videoConsultation.appointment.patientId}` : `doctor_${videoConsultation.appointment.doctorId}` }
+    );
+    joinToken.addGrant(grant);
+    const token = joinToken.toJwt();
 
     res.json({
       success: true,
       data: {
-        roomName: videoConsultation.roomName,
+        roomName: `consultation_${appointmentId}`,
         token,
         isPatient,
         appointment: videoConsultation.appointment
@@ -198,17 +208,15 @@ router.post('/end/:appointmentId', authenticateToken, async (req, res) => {
     await prisma.videoConsultation.update({
       where: { id: videoConsultation.id },
       data: {
-        status: 'completed',
-        endedAt: new Date(),
-        duration: duration || null,
-        summary: summary || null
+        status: VideoConsultationStatus.ENDED,
+        endedAt: new Date()
       }
     });
 
     // Update appointment status
     await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { status: 'completed' }
+      data: { status: AppointmentStatus.COMPLETED }
     });
 
     res.json({

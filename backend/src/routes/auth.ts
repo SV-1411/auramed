@@ -1,12 +1,12 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
+import type { StringValue } from 'ms';
 import { body, validationResult } from 'express-validator';
 import { getDatabase } from '../config/database';
 import { getRedis } from '../config/redis';
 import { logger } from '../utils/logger';
 import { createError } from '../middleware/errorHandler';
-
 const router = express.Router();
 
 // Register new user
@@ -17,7 +17,7 @@ router.post('/register', [
   body('role').isIn(['PATIENT', 'DOCTOR', 'ADMIN']),
   body('firstName').notEmpty().trim(),
   body('lastName').notEmpty().trim()
-], async (req, res, next) => {
+], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -95,8 +95,8 @@ router.post('/register', [
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, role: user.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      process.env.JWT_SECRET as jwt.Secret,
+      ({ expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as StringValue } as SignOptions)
     );
 
     // Store session in Redis
@@ -133,7 +133,7 @@ router.post('/register', [
 router.post('/login', [
   body('email').isEmail().normalizeEmail(),
   body('password').notEmpty()
-], async (req, res, next) => {
+], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -166,8 +166,8 @@ router.post('/login', [
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, role: user.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      process.env.JWT_SECRET as jwt.Secret,
+      ({ expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as StringValue } as SignOptions)
     );
 
     // Store session in Redis
@@ -201,7 +201,7 @@ router.post('/login', [
 });
 
 // Logout user
-router.post('/logout', async (req, res, next) => {
+router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
@@ -226,7 +226,7 @@ router.post('/logout', async (req, res, next) => {
 });
 
 // Refresh token
-router.post('/refresh', async (req, res, next) => {
+router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
@@ -246,10 +246,11 @@ router.post('/refresh', async (req, res, next) => {
     }
 
     // Generate new token
+    const signOptions: SignOptions = { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as StringValue };
     const newToken = jwt.sign(
       { userId: user.id, role: user.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      process.env.JWT_SECRET as jwt.Secret,
+      signOptions
     );
 
     res.json({
@@ -262,7 +263,7 @@ router.post('/refresh', async (req, res, next) => {
 });
 
 // Get current user profile
-router.get('/me', async (req, res, next) => {
+router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {

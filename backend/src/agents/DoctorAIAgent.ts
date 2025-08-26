@@ -49,7 +49,8 @@ export class DoctorAIAgent {
       
       Patient Symptoms: ${appointment.symptoms.join(', ')}
       Consultation Notes: ${consultationNotes}
-      Risk Score: ${appointment.riskScore.score}
+      Risk Level: ${String(appointment.riskLevel || 'LOW')}
+      Risk Score: ${String(appointment.riskScore ?? 0)}
       
       Provide a JSON response with:
       - diagnosis: string
@@ -92,13 +93,29 @@ export class DoctorAIAgent {
         diagnosis: parsedSummary.diagnosis,
         prescription: parsedSummary.prescriptions,
         visitSummary: parsedSummary.treatmentPlan,
-        riskScore: appointment.riskScore,
+        riskScore: {
+          level: String(appointment.riskLevel || 'LOW').toLowerCase() as any,
+          score: Number(appointment.riskScore ?? 0),
+          factors: [],
+          aiRecommendation: parsedSummary.riskAssessment || 'N/A'
+        },
         followUpRequired: parsedSummary.followUpRequired,
         followUpDate: parsedSummary.followUpDate ? new Date(parsedSummary.followUpDate) : undefined
       };
 
       // Save medical record
-      await this.medicalRecordService.createMedicalRecord(medicalRecord);
+      await this.medicalRecordService.createMedicalRecord({
+        patientId: appointment.patientId,
+        doctorId: appointment.doctorId,
+        appointmentId: appointment.id,
+        diagnosis: parsedSummary.diagnosis,
+        symptoms: parsedSummary.symptoms ?? [],
+        treatment: parsedSummary.treatmentPlan ?? consultationNotes,
+        prescription: Array.isArray(parsedSummary.prescriptions)
+          ? JSON.stringify(parsedSummary.prescriptions)
+          : undefined,
+        notes: parsedSummary.doctorNotes ?? consultationNotes
+      });
 
       // Update doctor quality metrics
       await this.updateDoctorQualityMetrics(appointment.doctorId, appointment);
@@ -236,7 +253,17 @@ export class DoctorAIAgent {
     try {
       // Get patient's current medications
       const patientHistory = await this.medicalRecordService.getPatientMedicalHistory(patientId);
-      const currentMedications = patientHistory.flatMap(record => record.prescription);
+      const currentMedications = patientHistory.flatMap(record => {
+        try {
+          const raw = (record as any).prescription;
+          if (!raw) return [] as any[];
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (Array.isArray(parsed)) return parsed;
+          return [] as any[];
+        } catch {
+          return [] as any[];
+        }
+      });
 
       const allMedications = [
         ...currentMedications.map(p => p.medicationName),
