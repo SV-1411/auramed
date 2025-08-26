@@ -1,11 +1,23 @@
 import { Server } from 'socket.io';
 import { Socket } from 'socket.io';
-import { AIAgentMessage } from '../../../shared/types';
 import { PatientAIAgent } from './PatientAIAgent';
 import { DoctorAIAgent } from './DoctorAIAgent';
 import { AdminAIAgent } from './AdminAIAgent';
 import { logger } from '../utils/logger';
 import { RedisService } from '../services/RedisService';
+
+// Local message type to standardize across agents
+export interface AIAgentMessage {
+  id: string;
+  agentType: 'patient' | 'doctor' | 'admin';
+  fromUserId: string;
+  toUserId?: string;
+  content: string;
+  messageType: 'text' | 'symptom_analysis' | 'appointment_booking' | 'prescription' | 'alert';
+  metadata?: Record<string, any>;
+  timestamp: Date;
+  isProcessed: boolean;
+}
 
 export class AgentOrchestrator {
   private patientAgent: PatientAIAgent;

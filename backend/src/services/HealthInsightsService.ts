@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, AppointmentStatus, InsightType, Severity, Gender } from '@prisma/client';
 import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
@@ -49,11 +49,11 @@ export class HealthInsightsService {
         include: {
           patientProfile: true,
           medicalRecords: {
-            orderBy: { createdAt: 'desc' },
+            orderBy: { date: 'desc' },
             take: 10
           },
           appointments: {
-            where: { status: 'completed' },
+            where: { status: AppointmentStatus.COMPLETED },
             orderBy: { scheduledAt: 'desc' },
             take: 5
           }
@@ -78,27 +78,25 @@ export class HealthInsightsService {
       const preventiveInsights = await this.generatePreventiveCareInsights(patient);
       insights.push(...preventiveInsights);
 
-      // Store insights in database
+      // Store insights in database (conform to HealthInsight schema)
       for (const insight of insights) {
         await prisma.healthInsight.upsert({
           where: { id: insight.id },
           create: {
             id: insight.id,
             patientId: insight.patientId,
-            type: insight.type,
+            type: this.mapInsightType(insight.type),
             title: insight.title,
             description: insight.description,
-            severity: insight.severity,
+            severity: this.mapSeverity(insight.severity),
             actionRequired: insight.actionRequired,
-            recommendations: insight.recommendations,
-            relatedMetrics: insight.relatedMetrics,
-            expiresAt: insight.expiresAt
+            confidence: 0.8
           },
           update: {
             description: insight.description,
-            severity: insight.severity,
+            severity: this.mapSeverity(insight.severity),
             actionRequired: insight.actionRequired,
-            recommendations: insight.recommendations
+            confidence: 0.8
           }
         });
       }
@@ -173,7 +171,6 @@ export class HealthInsightsService {
   private async analyzeRiskFactors(patient: any): Promise<HealthInsight[]> {
     const insights: HealthInsight[] = [];
     const medicalRecords = patient.medicalRecords;
-    const allergies = patient.patientProfile?.allergies || [];
 
     // Analyze chronic conditions
     const chronicConditions = this.extractChronicConditions(medicalRecords);
@@ -220,26 +217,7 @@ export class HealthInsightsService {
       });
     }
 
-    // Allergy alerts
-    if (allergies.length > 0) {
-      insights.push({
-        id: `${patient.id}-allergy-alert`,
-        patientId: patient.id,
-        type: 'risk_alert',
-        title: 'Allergy Information',
-        description: `You have ${allergies.length} known allergies. Always inform healthcare providers about your allergies.`,
-        severity: 'medium',
-        actionRequired: false,
-        recommendations: [
-          'Carry an updated list of your allergies',
-          'Inform all healthcare providers about your allergies',
-          'Consider wearing a medical alert bracelet',
-          'Keep emergency medications (like EpiPen) if prescribed'
-        ],
-        relatedMetrics: [],
-        createdAt: new Date()
-      });
-    }
+    // Note: Allergy data is not present in schema; skipping allergy alerts
 
     return insights;
   }
@@ -250,7 +228,7 @@ export class HealthInsightsService {
   private async generatePreventiveCareInsights(patient: any): Promise<HealthInsight[]> {
     const insights: HealthInsight[] = [];
     const age = this.calculateAge(patient.patientProfile?.dateOfBirth);
-    const gender = patient.patientProfile?.gender;
+    const gender = patient.patientProfile?.gender as Gender | undefined;
 
     // Age-based screening recommendations
     if (age >= 40) {
@@ -286,7 +264,7 @@ export class HealthInsightsService {
         actionRequired: false,
         recommendations: [
           'Colonoscopy every 10 years (or as recommended)',
-          gender === 'female' ? 'Annual mammogram' : 'Prostate screening discussion with doctor',
+          gender === Gender.FEMALE ? 'Annual mammogram' : 'Prostate screening discussion with doctor',
           'Skin cancer screening annually',
           'Discuss family history with your doctor'
         ],
@@ -327,9 +305,9 @@ export class HealthInsightsService {
       const patient = await prisma.user.findUnique({
         where: { id: patientId },
         include: {
-          patientProfile: true,
+          patientProfile: { include: { familyMembers: true } },
           medicalRecords: true,
-          familyMembers: true
+          // family members are accessed via patientProfile
         }
       });
 
@@ -338,8 +316,9 @@ export class HealthInsightsService {
       }
 
       const age = this.calculateAge(patient.patientProfile?.dateOfBirth);
-      const medicalHistory = patient.patientProfile?.medicalHistory || [];
-      const allergies = patient.patientProfile?.allergies || [];
+      const medicalHistory = (patient.medicalRecords || [])
+        .flatMap((r: any) => [r.diagnosis, ...(r.riskFactors || [])])
+        .filter(Boolean) as string[];
 
       // Calculate risk factors (simplified algorithm)
       const riskFactors = {
@@ -446,6 +425,36 @@ export class HealthInsightsService {
     if (medicalHistory.some(h => h.toLowerCase().includes('obesity'))) risk += 0.6;
     if (medicalHistory.some(h => h.toLowerCase().includes('overweight'))) risk += 0.3;
     return Math.min(risk, 1);
+  }
+
+  private mapInsightType(t: HealthInsight['type']): InsightType {
+    switch (t) {
+      case 'risk_alert':
+        return InsightType.ALERT;
+      case 'trend_analysis':
+        return InsightType.TREND;
+      case 'improvement':
+        return InsightType.TREND;
+      case 'recommendation':
+      case 'preventive_care':
+        return InsightType.RECOMMENDATION;
+      default:
+        return InsightType.RECOMMENDATION;
+    }
+  }
+
+  private mapSeverity(s: HealthInsight['severity']): Severity {
+    switch (s) {
+      case 'low':
+        return Severity.INFO;
+      case 'medium':
+        return Severity.WARNING;
+      case 'high':
+      case 'critical':
+        return Severity.CRITICAL;
+      default:
+        return Severity.WARNING;
+    }
   }
 
   /**

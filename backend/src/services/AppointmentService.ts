@@ -1,7 +1,7 @@
 import { getDatabase } from '../config/database';
 import { getRedis } from '../config/redis';
 import { logger } from '../utils/logger';
-import { Appointment, User } from '../../../shared/types';
+import { AppointmentStatus } from '@prisma/client';
 
 export class AppointmentService {
   private db = getDatabase();
@@ -105,7 +105,7 @@ export class AppointmentService {
     }
   }
 
-  async updateAppointmentStatus(appointmentId: string, status: string): Promise<any> {
+  async updateAppointmentStatus(appointmentId: string, status: AppointmentStatus): Promise<any> {
     try {
       return await this.db.appointment.update({
         where: { id: appointmentId },

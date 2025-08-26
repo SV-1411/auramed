@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, PaymentStatus, PaymentMethod } from '@prisma/client';
 import { logger } from '../utils/logger';
 import Stripe from 'stripe';
 
@@ -7,17 +7,16 @@ interface PaymentRequest {
   patientId: string;
   amount: number;
   currency: string;
-  method: 'card' | 'upi' | 'wallet' | 'deferred';
+  method: 'card' | 'upi' | 'wallet' | 'emi' | 'deferred';
   paymentMethodId?: string;
 }
 
 interface PaymentResult {
   id: string;
-  status: 'succeeded' | 'pending' | 'failed' | 'deferred';
+  status: 'succeeded' | 'pending' | 'failed' | 'deferred' | 'refunded';
   amount: number;
   currency: string;
   transactionId?: string;
-  failureReason?: string;
 }
 
 export class PaymentService {
@@ -60,11 +59,11 @@ export class PaymentService {
           patientId: request.patientId,
           amount: request.amount,
           currency: request.currency,
-          method: request.method,
-          status: paymentIntent.status === 'succeeded' ? 'completed' : 'pending',
-          transactionId: paymentIntent.id,
-          gatewayResponse: JSON.stringify(paymentIntent),
-          processedAt: paymentIntent.status === 'succeeded' ? new Date() : null
+          method: this.mapMethod(request.method),
+          status: paymentIntent.status === 'succeeded' ? PaymentStatus.PAID : PaymentStatus.PROCESSING,
+          gatewayTransactionId: paymentIntent.id,
+          gatewayResponse: paymentIntent as any,
+          completedAt: paymentIntent.status === 'succeeded' ? new Date() : null
         }
       });
 
@@ -86,9 +85,9 @@ export class PaymentService {
           patientId: request.patientId,
           amount: request.amount,
           currency: request.currency,
-          method: request.method,
-          status: 'failed',
-          failureReason: error instanceof Error ? error.message : 'Unknown error'
+          method: this.mapMethod(request.method),
+          status: PaymentStatus.FAILED,
+          gatewayResponse: error instanceof Error ? { message: error.message } as any : undefined
         }
       });
 
@@ -96,8 +95,7 @@ export class PaymentService {
         id: '',
         status: 'failed',
         amount: request.amount,
-        currency: request.currency,
-        failureReason: error instanceof Error ? error.message : 'Payment processing failed'
+        currency: request.currency
       };
     }
   }
@@ -109,9 +107,8 @@ export class PaymentService {
         patientId: request.patientId,
         amount: request.amount,
         currency: request.currency,
-        method: 'deferred',
-        status: 'deferred',
-        deferredUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+        method: PaymentMethod.DEFERRED,
+        status: PaymentStatus.DEFERRED
       }
     });
 
@@ -133,10 +130,10 @@ export class PaymentService {
           patientId: request.patientId,
           amount: request.amount,
           currency: request.currency,
-          method: request.method,
-          status: 'completed',
-          transactionId: `rzp_${Date.now()}`,
-          processedAt: new Date()
+          method: this.mapMethod(request.method),
+          status: PaymentStatus.PAID,
+          gatewayTransactionId: `rzp_${Date.now()}`,
+          completedAt: new Date()
         }
       });
 
@@ -145,7 +142,7 @@ export class PaymentService {
         status: 'succeeded',
         amount: request.amount,
         currency: request.currency,
-        transactionId: paymentRecord.transactionId!
+        transactionId: paymentRecord.gatewayTransactionId || undefined
       };
 
     } catch (error) {
@@ -154,8 +151,7 @@ export class PaymentService {
         id: '',
         status: 'failed',
         amount: request.amount,
-        currency: request.currency,
-        failureReason: error instanceof Error ? error.message : 'Razorpay payment failed'
+        currency: request.currency
       };
     }
   }
@@ -166,12 +162,12 @@ export class PaymentService {
         where: { id: paymentId }
       });
 
-      if (!payment || !payment.transactionId) {
+      if (!payment || !payment.gatewayTransactionId) {
         throw new Error('Payment not found or no transaction ID');
       }
 
       const refund = await this.stripe.refunds.create({
-        payment_intent: payment.transactionId,
+        payment_intent: payment.gatewayTransactionId,
         amount: amount ? amount * 100 : undefined // Convert to cents if partial refund
       });
 
@@ -179,10 +175,11 @@ export class PaymentService {
       await this.prisma.paymentTransaction.update({
         where: { id: paymentId },
         data: {
-          status: 'refunded',
-          refundId: refund.id,
-          refundedAt: new Date(),
-          refundAmount: refund.amount / 100 // Convert back to dollars
+          status: PaymentStatus.REFUNDED,
+          gatewayResponse: {
+            ...(payment.gatewayResponse as any || {}),
+            refund: refund as any
+          } as any
         }
       });
 
@@ -206,11 +203,10 @@ export class PaymentService {
 
       return {
         id: payment.id,
-        status: payment.status as any,
+        status: this.mapResultStatus(payment.status),
         amount: payment.amount,
         currency: payment.currency,
-        transactionId: payment.transactionId || undefined,
-        failureReason: payment.failureReason || undefined
+        transactionId: payment.gatewayTransactionId || undefined
       };
 
     } catch (error) {
@@ -223,10 +219,7 @@ export class PaymentService {
     try {
       const deferredPayments = await this.prisma.paymentTransaction.findMany({
         where: {
-          status: 'deferred',
-          deferredUntil: {
-            lte: new Date()
-          }
+          status: PaymentStatus.DEFERRED
         }
       });
 
@@ -237,7 +230,7 @@ export class PaymentService {
         // Update status to pending for manual collection
         await this.prisma.paymentTransaction.update({
           where: { id: payment.id },
-          data: { status: 'pending' }
+          data: { status: PaymentStatus.PENDING }
         });
       }
 
@@ -246,19 +239,54 @@ export class PaymentService {
     }
   }
 
+  private mapMethod(method: PaymentRequest['method']): PaymentMethod {
+    switch (method) {
+      case 'card':
+        return PaymentMethod.CARD;
+      case 'wallet':
+        return PaymentMethod.WALLET;
+      case 'emi':
+        return PaymentMethod.EMI;
+      case 'deferred':
+        return PaymentMethod.DEFERRED;
+      case 'upi':
+      default:
+        return PaymentMethod.WALLET;
+    }
+  }
+
+  private mapResultStatus(status: PaymentStatus): PaymentResult['status'] {
+    switch (status) {
+      case PaymentStatus.PAID:
+        return 'succeeded';
+      case PaymentStatus.PENDING:
+      case PaymentStatus.PROCESSING:
+        return 'pending';
+      case PaymentStatus.DEFERRED:
+        return 'deferred';
+      case PaymentStatus.REFUNDED:
+        return 'refunded';
+      case PaymentStatus.FAILED:
+      default:
+        return 'failed';
+    }
+  }
+
   async generatePaymentLink(request: PaymentRequest): Promise<string> {
     try {
+      // Payment Links API requires a Price; price_data is not accepted here.
+      const price = await this.stripe.prices.create({
+        unit_amount: request.amount * 100,
+        currency: request.currency.toLowerCase(),
+        product_data: {
+          name: 'Medical Consultation'
+        }
+      });
+
       const paymentLink = await this.stripe.paymentLinks.create({
         line_items: [
           {
-            price_data: {
-              currency: request.currency.toLowerCase(),
-              product_data: {
-                name: 'Medical Consultation',
-                description: `Appointment ID: ${request.appointmentId}`
-              },
-              unit_amount: request.amount * 100
-            },
+            price: price.id,
             quantity: 1
           }
         ],

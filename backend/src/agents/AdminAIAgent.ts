@@ -1,4 +1,39 @@
-import { AIAgentMessage, SystemAlert, DoctorQualityMetrics, User } from '../../../shared/types';
+// Minimal local types to avoid cross-package import issues
+export interface AIAgentMessage {
+  id: string;
+  agentType: 'patient' | 'doctor' | 'admin';
+  fromUserId: string;
+  toUserId?: string;
+  content: string;
+  messageType: 'text' | 'symptom_analysis' | 'appointment_booking' | 'prescription' | 'alert';
+  metadata?: Record<string, any>;
+  timestamp: Date;
+  isProcessed: boolean;
+}
+
+export interface SystemAlert {
+  id: string;
+  type: 'fraud_detection' | 'compliance_violation' | 'system_error';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  title: string;
+  description: string;
+  affectedEntity: 'payment' | 'appointment' | 'doctor' | 'data' | string;
+  entityId: string;
+  isResolved: boolean;
+  createdAt: Date;
+}
+
+export interface DoctorQualityMetrics {
+  doctorId: string;
+  totalConsultations: number;
+  averageRating: number;
+  diagnosticAccuracy: number; // percent 0-100
+  responseTime: number; // minutes
+  followUpCompliance: number; // percent 0-100
+  patientSatisfaction: number; // percent 0-100
+  qualityScore: number; // 0-100
+  lastUpdated: Date;
+}
 import { logger } from '../utils/logger';
 import { PrismaClient, UserRole } from '@prisma/client';
 import { OpenAIService } from '../services/OpenAIService';

@@ -1,4 +1,29 @@
-import { AIAgentMessage, SymptomAnalysis, RiskScore, Appointment } from '../../../shared/types';
+// Minimal local types to avoid cross-package import issues
+export interface AIAgentMessage {
+  id: string;
+  agentType: 'patient' | 'doctor' | 'admin';
+  fromUserId: string;
+  toUserId?: string;
+  content: string;
+  messageType: 'text' | 'symptom_analysis' | 'appointment_booking' | 'prescription' | 'alert';
+  metadata?: Record<string, any>;
+  timestamp: Date;
+  isProcessed: boolean;
+}
+
+export interface SymptomAnalysis {
+  symptoms: string[];
+  riskScore: {
+    level: 'low' | 'medium' | 'high' | 'critical';
+    score: number;
+    factors: string[];
+    aiRecommendation: string;
+  };
+  recommendedAction: 'self_care' | 'schedule_appointment' | 'urgent_consultation' | 'emergency';
+  suggestedSpecialization?: string[];
+  estimatedWaitTime?: number;
+  aiConfidence: number;
+}
 import { logger } from '../utils/logger';
 import { OpenAIService } from '../services/OpenAIService';
 import { AppointmentService } from '../services/AppointmentService';

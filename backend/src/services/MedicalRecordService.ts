@@ -1,4 +1,4 @@
-import { PrismaClient, MedicalRecord } from '@prisma/client';
+import { PrismaClient, MedicalRecord, UserRole, RiskLevel } from '@prisma/client';
 import { logger } from '../utils/logger';
 
 export class MedicalRecordService {
@@ -10,26 +10,31 @@ export class MedicalRecordService {
 
   async createMedicalRecord(data: {
     patientId: string;
-    doctorId: string;
-    appointmentId: string;
+    doctorId?: string;
     diagnosis: string;
     symptoms: string[];
-    treatment: string;
-    prescription?: string;
-    notes?: string;
+    visitSummary?: string;
+    riskLevel?: MedicalRecord['riskLevel'];
+    riskScore?: number;
+    riskFactors?: string[];
+    aiRecommendation?: string;
+    followUpRequired?: boolean;
+    followUpDate?: Date | null;
   }): Promise<MedicalRecord> {
     try {
       return await this.prisma.medicalRecord.create({
         data: {
           patientId: data.patientId,
           doctorId: data.doctorId,
-          appointmentId: data.appointmentId,
           diagnosis: data.diagnosis,
           symptoms: data.symptoms,
-          treatment: data.treatment,
-          prescription: data.prescription,
-          notes: data.notes,
-          createdAt: new Date()
+          visitSummary: data.visitSummary ?? '',
+          riskLevel: (data.riskLevel as RiskLevel | undefined) ?? RiskLevel.LOW,
+          riskScore: data.riskScore ?? 0,
+          riskFactors: data.riskFactors ?? [],
+          aiRecommendation: data.aiRecommendation ?? '',
+          followUpRequired: data.followUpRequired ?? false,
+          followUpDate: data.followUpDate ?? undefined
         }
       });
     } catch (error) {
@@ -44,8 +49,7 @@ export class MedicalRecordService {
         where: { id: recordId },
         include: {
           patient: true,
-          doctor: true,
-          appointment: true
+          doctor: true
         }
       });
     } catch (error) {
@@ -59,17 +63,9 @@ export class MedicalRecordService {
       return await this.prisma.medicalRecord.findMany({
         where: { patientId },
         include: {
-          doctor: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              profile: true
-            }
-          },
-          appointment: true
+          doctor: { include: { doctorProfile: true } }
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { date: 'desc' }
       });
     } catch (error) {
       logger.error('Error fetching patient medical history:', error);
@@ -82,17 +78,9 @@ export class MedicalRecordService {
       return await this.prisma.medicalRecord.findMany({
         where: { doctorId },
         include: {
-          patient: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              dateOfBirth: true
-            }
-          },
-          appointment: true
+          patient: { include: { patientProfile: true } }
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { date: 'desc' }
       });
     } catch (error) {
       logger.error('Error fetching doctor medical records:', error);
@@ -105,8 +93,7 @@ export class MedicalRecordService {
       return await this.prisma.medicalRecord.update({
         where: { id: recordId },
         data: {
-          ...updateData,
-          updatedAt: new Date()
+          ...updateData
         }
       });
     } catch (error) {
@@ -136,30 +123,18 @@ export class MedicalRecordService {
         where.symptoms = { hasSome: searchParams.symptoms };
       }
       if (searchParams.dateFrom || searchParams.dateTo) {
-        where.createdAt = {};
-        if (searchParams.dateFrom) where.createdAt.gte = searchParams.dateFrom;
-        if (searchParams.dateTo) where.createdAt.lte = searchParams.dateTo;
+        where.date = {};
+        if (searchParams.dateFrom) where.date.gte = searchParams.dateFrom;
+        if (searchParams.dateTo) where.date.lte = searchParams.dateTo;
       }
 
       return await this.prisma.medicalRecord.findMany({
         where,
         include: {
-          patient: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true
-            }
-          },
-          doctor: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true
-            }
-          }
+          patient: { include: { patientProfile: true } },
+          doctor: { include: { doctorProfile: true } }
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { date: 'desc' },
         take: searchParams.limit || 50
       });
     } catch (error) {
@@ -168,20 +143,7 @@ export class MedicalRecordService {
     }
   }
 
-  async getRecordsByAppointment(appointmentId: string): Promise<MedicalRecord[]> {
-    try {
-      return await this.prisma.medicalRecord.findMany({
-        where: { appointmentId },
-        include: {
-          patient: true,
-          doctor: true
-        }
-      });
-    } catch (error) {
-      logger.error('Error fetching records by appointment:', error);
-      throw error;
-    }
-  }
+  // Note: MedicalRecord does not reference Appointment in schema; getRecordsByAppointment removed.
 
   async generateMedicalSummary(patientId: string, dateRange?: { from: Date; to: Date }): Promise<{
     totalRecords: number;
@@ -193,7 +155,7 @@ export class MedicalRecordService {
     try {
       const where: any = { patientId };
       if (dateRange) {
-        where.createdAt = {
+        where.date = {
           gte: dateRange.from,
           lte: dateRange.to
         };
@@ -201,7 +163,7 @@ export class MedicalRecordService {
 
       const records = await this.prisma.medicalRecord.findMany({
         where,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { date: 'desc' }
       });
 
       // Analyze diagnoses
@@ -231,11 +193,11 @@ export class MedicalRecordService {
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
 
-      // Get recent treatments
+      // Get recent visit summaries (as treatments proxy)
       const recentTreatments = records
         .slice(0, 5)
-        .map(record => record.treatment)
-        .filter(treatment => treatment);
+        .map(record => record.visitSummary)
+        .filter(summary => summary) as string[];
 
       // Identify chronic conditions (diagnoses appearing multiple times)
       const chronicConditions = commonDiagnoses
@@ -273,7 +235,7 @@ export class MedicalRecordService {
     }
   }
 
-  async validateRecordAccess(recordId: string, userId: string, userRole: string): Promise<boolean> {
+  async validateRecordAccess(recordId: string, userId: string, userRole: UserRole): Promise<boolean> {
     try {
       const record = await this.prisma.medicalRecord.findUnique({
         where: { id: recordId },
@@ -286,13 +248,13 @@ export class MedicalRecordService {
       if (!record) return false;
 
       // Admin can access all records
-      if (userRole === 'ADMIN') return true;
+      if (userRole === UserRole.ADMIN) return true;
 
       // Patient can access their own records
-      if (userRole === 'PATIENT' && record.patientId === userId) return true;
+      if (userRole === UserRole.PATIENT && record.patientId === userId) return true;
 
       // Doctor can access records they created
-      if (userRole === 'DOCTOR' && record.doctorId === userId) return true;
+      if (userRole === UserRole.DOCTOR && record.doctorId === userId) return true;
 
       return false;
     } catch (error) {

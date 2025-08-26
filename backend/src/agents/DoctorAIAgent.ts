@@ -1,4 +1,49 @@
-import { AIAgentMessage, MedicalRecord, Prescription, DoctorQualityMetrics } from '../../../shared/types';
+// Minimal local types to avoid cross-package import issues
+export interface AIAgentMessage {
+  id: string;
+  agentType: 'patient' | 'doctor' | 'admin';
+  fromUserId: string;
+  toUserId?: string;
+  content: string;
+  messageType: 'text' | 'symptom_analysis' | 'appointment_booking' | 'prescription' | 'alert';
+  metadata?: Record<string, any>;
+  timestamp: Date;
+  isProcessed: boolean;
+}
+
+export interface Prescription {
+  medicationName: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions: string;
+}
+
+export interface MedicalRecord {
+  id: string;
+  patientId: string;
+  doctorId?: string;
+  date: Date;
+  symptoms: string[];
+  diagnosis: string;
+  prescription: Prescription[];
+  visitSummary: string;
+  riskScore: {
+    level: 'low' | 'medium' | 'high' | 'critical' | any;
+    score: number;
+    factors: string[];
+    aiRecommendation: string;
+  };
+  followUpRequired: boolean;
+  followUpDate?: Date;
+}
+
+export interface DoctorQualityMetrics {
+  doctorId: string;
+  totalConsultations?: number;
+  responseTime?: number;
+  lastUpdated?: Date;
+}
 import { logger } from '../utils/logger';
 import { OpenAIService } from '../services/OpenAIService';
 import { AppointmentService } from '../services/AppointmentService';
@@ -107,14 +152,13 @@ export class DoctorAIAgent {
       await this.medicalRecordService.createMedicalRecord({
         patientId: appointment.patientId,
         doctorId: appointment.doctorId,
-        appointmentId: appointment.id,
         diagnosis: parsedSummary.diagnosis,
         symptoms: parsedSummary.symptoms ?? [],
-        treatment: parsedSummary.treatmentPlan ?? consultationNotes,
-        prescription: Array.isArray(parsedSummary.prescriptions)
-          ? JSON.stringify(parsedSummary.prescriptions)
-          : undefined,
-        notes: parsedSummary.doctorNotes ?? consultationNotes
+        visitSummary: parsedSummary.treatmentPlan ?? consultationNotes,
+        riskScore: Number(appointment.riskScore ?? 0),
+        aiRecommendation: parsedSummary.riskAssessment || 'N/A',
+        followUpRequired: Boolean(parsedSummary.followUpRequired),
+        followUpDate: parsedSummary.followUpDate ? new Date(parsedSummary.followUpDate) : undefined
       });
 
       // Update doctor quality metrics

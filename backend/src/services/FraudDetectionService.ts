@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UserRole, AlertType, Severity } from '@prisma/client';
 import { logger } from '../utils/logger';
 
 export interface SuspiciousPayment {
@@ -37,23 +37,23 @@ export class FraudDetectionService {
       const suspiciousPayments: SuspiciousPayment[] = [];
       
       // Get recent payments for analysis
-      const recentPayments = await this.prisma.payment.findMany({
+      const recentPayments = await this.prisma.paymentTransaction.findMany({
         where: {
           createdAt: {
             gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
           }
         },
         include: {
-          user: true
+          patient: true
         }
       });
 
       // Group payments by user
       const paymentsByUser = recentPayments.reduce((acc, payment) => {
-        if (!acc[payment.userId]) {
-          acc[payment.userId] = [];
+        if (!acc[payment.patientId]) {
+          acc[payment.patientId] = [];
         }
-        acc[payment.userId].push(payment);
+        acc[payment.patientId].push(payment);
         return acc;
       }, {} as { [userId: string]: any[] });
 
@@ -131,12 +131,12 @@ export class FraudDetectionService {
       
       // Get all doctors for credential verification
       const doctors = await this.prisma.user.findMany({
-        where: { role: 'DOCTOR' },
-        include: { profile: true }
+        where: { role: UserRole.DOCTOR },
+        include: { doctorProfile: true }
       });
 
       for (const doctor of doctors) {
-        const profile = doctor.profile as any;
+        const profile = (doctor as any).doctorProfile as any;
         if (!profile) continue;
 
         const issues = this.validateDoctorCredentials(doctor.id, profile);
@@ -303,15 +303,18 @@ export class FraudDetectionService {
     evidence: any;
   }): Promise<void> {
     try {
-      await this.prisma.fraudIncident.create({
+      // No FraudIncident model in schema; raising a SystemAlert instead
+      await this.prisma.systemAlert.create({
         data: {
-          type: incidentData.type,
-          entityId: incidentData.entityId,
+          type: AlertType.FRAUD_DETECTION,
+          severity: this.mapSeverity(incidentData.severity),
+          title: `Fraud incident: ${incidentData.type}`,
           description: incidentData.description,
-          severity: incidentData.severity,
-          evidence: JSON.stringify(incidentData.evidence),
-          status: 'PENDING',
-          reportedAt: new Date()
+          affectedEntity: incidentData.type,
+          entityId: incidentData.entityId,
+          isResolved: false,
+          assignedTo: null,
+          // createdAt is defaulted by schema
         }
       });
 
@@ -319,6 +322,16 @@ export class FraudDetectionService {
     } catch (error) {
       logger.error('Error reporting fraud incident:', error);
       throw error;
+    }
+  }
+
+  private mapSeverity(sev: 'low' | 'medium' | 'high' | 'critical'): Severity {
+    switch (sev) {
+      case 'low': return Severity.INFO;
+      case 'medium': return Severity.WARNING;
+      case 'high':
+      case 'critical': return Severity.CRITICAL;
+      default: return Severity.WARNING;
     }
   }
 }

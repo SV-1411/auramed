@@ -1,6 +1,12 @@
 import { createClient, RedisClientType } from 'redis';
 import { logger } from '../utils/logger';
-import { AIAgentMessage, SystemAlert } from '../../../shared/types';
+
+// Minimal local type to avoid cross-package import issues
+export interface AIAgentMessage {
+  id: string;
+  agentType?: string;
+  [key: string]: any;
+}
 
 export class RedisService {
   private client: RedisClientType;
