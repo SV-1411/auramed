@@ -53,3 +53,5 @@ auramed/
 ├── shared/            # Shared types and utilities
 └── docs/              # Documentation
 ```
+ 
+ 

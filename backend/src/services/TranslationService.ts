@@ -1,4 +1,4 @@
-import { Translate } from '@google-cloud/translate/build/src/v2';
+import axios from 'axios';
 import { logger } from '../utils/logger';
 
 export interface TranslationOptions {
@@ -13,7 +13,7 @@ export interface SupportedLanguage {
 }
 
 export class TranslationService {
-  private translate: Translate;
+  private baseUrl: string;
   private supportedLanguages: SupportedLanguage[] = [
     { code: 'en', name: 'English', nativeName: 'English' },
     { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी' },
@@ -31,11 +31,8 @@ export class TranslationService {
   ];
 
   constructor() {
-    // Initialize Google Translate with credentials
-    this.translate = new Translate({
-      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-      keyFilename: process.env.GOOGLE_CLOUD_KEY_FILE
-    });
+    // Use free MyMemory translation API
+    this.baseUrl = 'https://api.mymemory.translated.net';
   }
 
   /**
@@ -52,17 +49,26 @@ export class TranslationService {
         throw new Error(`Language ${options.targetLanguage} is not supported`);
       }
 
-      const [translation] = await this.translate.translate(text, {
-        to: options.targetLanguage,
-        from: options.sourceLanguage
+      const sourceLang = options.sourceLanguage || 'auto';
+      const langPair = `${sourceLang}|${options.targetLanguage}`;
+      
+      const response = await axios.get(`${this.baseUrl}/get`, {
+        params: {
+          q: text,
+          langpair: langPair
+        }
       });
 
-      logger.info(`Translated text from ${options.sourceLanguage || 'auto'} to ${options.targetLanguage}`);
-      return translation;
+      if (response.data.responseStatus === 200) {
+        logger.info(`Translated text from ${sourceLang} to ${options.targetLanguage}`);
+        return response.data.responseData.translatedText;
+      } else {
+        throw new Error('Translation failed');
+      }
 
     } catch (error) {
       logger.error('Translation failed:', error);
-      throw new Error('Translation service unavailable');
+      return text; // Return original text if translation fails
     }
   }
 
@@ -82,16 +88,20 @@ export class TranslationService {
   }
 
   /**
-   * Detect language of text
+   * Detect language of text (simplified for free API)
    */
   async detectLanguage(text: string): Promise<string> {
     try {
-      const [detection] = await this.translate.detect(text);
-      const language = Array.isArray(detection) ? detection[0] : detection;
-      return language.language;
+      // Simple language detection based on character patterns
+      if (/[\u0900-\u097F]/.test(text)) return 'hi'; // Hindi
+      if (/[\u0980-\u09FF]/.test(text)) return 'bn'; // Bengali
+      if (/[\u0C00-\u0C7F]/.test(text)) return 'te'; // Telugu
+      if (/[\u0B80-\u0BFF]/.test(text)) return 'ta'; // Tamil
+      // Add more patterns as needed
+      return 'en'; // Default to English
     } catch (error) {
       logger.error('Language detection failed:', error);
-      return 'en'; // Default to English
+      return 'en';
     }
   }
 

@@ -3,14 +3,26 @@ import { logger } from '../utils/logger';
 
 export class OpenAIService {
   private apiKey: string;
-  private baseURL: string;
+  private baseUrl: string;
+  private models: {
+    fast: string;
+    smart: string;
+    creative: string;
+  };
 
   constructor() {
-    this.apiKey = process.env.OPENAI_API_KEY || '';
-    this.baseURL = 'https://api.openai.com/v1';
+    this.apiKey = process.env.OPENROUTER_API_KEY || '';
+    this.baseUrl = 'https://openrouter.ai/api/v1';
+    
+    // Configure different models for different use cases
+    this.models = {
+      fast: 'google/gemini-2.0-flash-exp',      // Fast responses
+      smart: 'deepseek/deepseek-r1',            // Complex reasoning
+      creative: 'qwen/qwen-2.5-72b'             // Creative tasks
+    };
     
     if (!this.apiKey) {
-      logger.warn('OpenAI API key not configured');
+      logger.warn('OpenRouter API key not configured');
     }
   }
 
@@ -18,11 +30,13 @@ export class OpenAIService {
     systemPrompt: string, 
     userMessage: string, 
     userId: string,
-    model: string = 'gpt-4'
+    modelType: 'fast' | 'smart' | 'creative' = 'fast'
   ): Promise<string> {
     try {
+      const model = this.models[modelType];
+      
       const response = await axios.post(
-        `${this.baseURL}/chat/completions`,
+        `${this.baseUrl}/chat/completions`,
         {
           model,
           messages: [
@@ -30,26 +44,28 @@ export class OpenAIService {
             { role: 'user', content: userMessage }
           ],
           max_tokens: 1000,
-          temperature: 0.7,
+          temperature: modelType === 'creative' ? 0.8 : 0.7,
           user: userId
         },
         {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://auramed.app',
+            'X-Title': 'AuraMed Healthcare Platform'
           }
         }
       );
 
       const content = response.data.choices[0]?.message?.content;
       if (!content) {
-        throw new Error('No response content from OpenAI');
+        throw new Error('No response content from AI');
       }
 
-      logger.info(`OpenAI response generated for user: ${userId}`);
+      logger.info(`AI response generated using ${model} for user: ${userId}`);
       return content;
     } catch (error: any) {
-      logger.error('OpenAI API error:', error.response?.data || error.message);
+      logger.error('AI API error:', error.response?.data || error.message);
       
       // Fallback response
       return 'I apologize, but I\'m experiencing technical difficulties. Please try again in a moment or contact support if the issue persists.';
@@ -79,7 +95,8 @@ export class OpenAIService {
       const response = await this.generateResponse(
         'You are a medical AI assistant specializing in symptom analysis and triage. Provide accurate, evidence-based assessments.',
         prompt,
-        'system-symptom-analysis'
+        'system-symptom-analysis',
+        'smart' // Use smart model for medical analysis
       );
 
       return JSON.parse(response);
@@ -132,7 +149,8 @@ export class OpenAIService {
       const response = await this.generateResponse(
         'You are a medical AI assistant helping doctors generate safe, evidence-based prescriptions. Always consider drug interactions and contraindications.',
         prompt,
-        doctorId
+        doctorId,
+        'smart' // Use smart model for prescriptions
       );
 
       return JSON.parse(response);
@@ -175,7 +193,8 @@ export class OpenAIService {
       return await this.generateResponse(
         'You are a medical documentation AI assistant. Create clear, professional consultation summaries.',
         prompt,
-        'system-consultation-summary'
+        'system-consultation-summary',
+        'creative' // Use creative model for summaries
       );
     } catch (error) {
       logger.error('Consultation summary generation error:', error);
