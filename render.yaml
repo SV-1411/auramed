@@ -5,7 +5,6 @@ services:
     rootDir: backend
     buildCommand: npm install && npm run build
     startCommand: node dist/index.js
-    plan: free
     autoDeploy: true
     envVars:
       - key: NODE_ENV
@@ -29,7 +28,6 @@ services:
     rootDir: ai-service
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    plan: free
     autoDeploy: true
     envVars:
       - key: OPENROUTER_API_KEY
@@ -41,7 +39,6 @@ services:
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-    plan: free
     autoDeploy: true
     envVars:
       - key: VITE_API_URL
