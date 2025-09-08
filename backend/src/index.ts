@@ -29,6 +29,7 @@ import familyRoutes from './routes/family';
 import healthInsightsRoutes from './routes/health-insights';
 import translationRoutes from './routes/translation';
 import { router as predictiveInsightsRoutes } from './routes/predictive-insights';
+import predictiveMetricsRoutes from './routes/predictive-metrics';
 import aiAppointmentRoutes from './routes/ai-appointment';
 import consultationRoutes from './routes/consultation';
 
@@ -90,6 +91,7 @@ app.use('/api/family-members', familyRoutes); // Fix: Change to match frontend e
 app.use('/api/health-insights', healthInsightsRoutes);
 app.use('/api/translation', translationRoutes);
 app.use('/api/predictive-insights', predictiveInsightsRoutes);
+app.use('/api/predictive-metrics', predictiveMetricsRoutes);
 app.use('/api/ai-appointments', aiAppointmentRoutes);
 app.use('/api/consultations', consultationRoutes);
 

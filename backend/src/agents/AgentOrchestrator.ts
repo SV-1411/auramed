@@ -5,6 +5,8 @@ import { DoctorAIAgent } from './DoctorAIAgent';
 import { AdminAIAgent } from './AdminAIAgent';
 import { logger } from '../utils/logger';
 import { RedisService } from '../services/RedisService';
+import { ConversationMemoryService } from '../services/ConversationMemoryService';
+import { RAGService } from '../services/RAGService';
 
 // Local message type to standardize across agents
 export interface AIAgentMessage {
@@ -25,6 +27,8 @@ export class AgentOrchestrator {
   private adminAgent: AdminAIAgent;
   private io: Server;
   private redis: RedisService;
+  private memoryService: ConversationMemoryService;
+  private ragService: RAGService;
 
   constructor(
     patientAgent: PatientAIAgent,
@@ -36,6 +40,8 @@ export class AgentOrchestrator {
     this.doctorAgent = doctorAgent;
     this.adminAgent = adminAgent;
     this.io = io;
+    this.memoryService = new ConversationMemoryService();
+    this.ragService = new RAGService();
 
     // Only create RedisService if Redis is available
     const redisUrl = process.env.REDIS_URL;
@@ -60,6 +66,10 @@ export class AgentOrchestrator {
       logger.info('Setting up inter-agent communication channels...');
       // Set up inter-agent communication channels
       await this.setupAgentCommunication();
+
+      logger.info('Initializing RAG knowledge base...');
+      // Initialize medical knowledge base
+      await this.ragService.ensureBaseMedicalKBIndexed();
 
       logger.info('Starting background monitoring tasks...');
       // Start background monitoring tasks
@@ -91,6 +101,14 @@ export class AgentOrchestrator {
         isProcessed: false
       };
 
+      // Save user message to conversation memory
+      await this.memoryService.saveUserMessage(
+        message.fromUserId,
+        message.content,
+        message.messageType,
+        message.metadata
+      );
+
       // Store message in Redis for processing queue (skip if Redis not available)
       try {
         await this.redis.addToProcessingQueue(message);
@@ -101,6 +119,20 @@ export class AgentOrchestrator {
 
       // Route message to appropriate agent
       const response = await this.routeMessage(message);
+
+      // Save agent response to conversation memory
+      await this.memoryService.saveAgentMessage(
+        message.fromUserId,
+        response.content,
+        response.messageType,
+        response.metadata
+      );
+
+      // Update long-term summary with recent conversation
+      const recentMessages = await this.memoryService.getRecentMessages(message.fromUserId, 4);
+      if (recentMessages.length >= 2) {
+        await this.memoryService.updateLongTermSummary(message.fromUserId, recentMessages);
+      }
 
       // Send response back to client
       socket.emit('ai-response', response);

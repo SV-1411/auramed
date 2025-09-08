@@ -35,18 +35,24 @@ import { OpenAIService } from '../services/OpenAIService';
 import { AppointmentService } from '../services/AppointmentService';
 import { PaymentService } from '../services/PaymentService';
 import { NotificationService } from '../services/NotificationService';
+import { ConversationMemoryService } from '../services/ConversationMemoryService';
+import { RAGService } from '../services/RAGService';
 
 export class PatientAIAgent {
   private openAI: OpenAIService;
   private appointmentService: AppointmentService;
   private paymentService: PaymentService;
   private notificationService: NotificationService;
+  private memoryService: ConversationMemoryService;
+  private ragService: RAGService;
 
   constructor() {
     this.openAI = new OpenAIService();
     this.appointmentService = new AppointmentService();
     this.paymentService = new PaymentService();
     this.notificationService = new NotificationService();
+    this.memoryService = new ConversationMemoryService();
+    this.ragService = new RAGService();
   }
 
   async processMessage(message: AIAgentMessage): Promise<AIAgentMessage> {
@@ -70,7 +76,14 @@ export class PatientAIAgent {
   }
 
   private async handleGeneralQuery(message: AIAgentMessage): Promise<AIAgentMessage> {
-    const systemPrompt = `You are the AuraMed Patient AI Agent. Behave like a clinician performing triage and preliminary differential diagnosis.
+    // Get conversation context and relevant knowledge
+    const [conversationContext, relevantKnowledge] = await Promise.all([
+      this.memoryService.getFullConversationContext(message.fromUserId),
+      this.ragService.retrieveRelevant(message.content, message.fromUserId, 3)
+    ]);
+
+    // Build enhanced system prompt with context
+    let systemPrompt = `You are the AuraMed Patient AI Agent. Behave like a clinician performing triage and preliminary differential diagnosis.
     Goals:
     - Extract symptoms and key history (onset, duration, severity, associated symptoms, fever, travel, contacts, meds, chronic conditions)
     - Provide a differential diagnosis with probabilities (must sum ~1.0)
@@ -81,6 +94,45 @@ export class PatientAIAgent {
     Output style:
     - If the user message contains symptoms, include a short differential and triage guidance in the answer itself.
     - Ask 2-4 targeted follow‑ups if uncertainty is high.`;
+
+    // Add patient context
+    if (conversationContext.patientContext.profile) {
+      const profile = conversationContext.patientContext.profile;
+      systemPrompt += `\n\nPATIENT PROFILE:
+- Name: ${profile.firstName} ${profile.lastName}
+- Age: ${profile.age || 'Unknown'}
+- Gender: ${profile.gender || 'Unknown'}
+- Allergies: ${profile.allergies?.join(', ') || 'None known'}
+- Current medications: ${profile.medications?.join(', ') || 'None'}
+- Chronic conditions: ${profile.chronicConditions?.join(', ') || 'None'}`;
+    }
+
+    // Add conversation summary
+    if (conversationContext.longTermSummary) {
+      systemPrompt += `\n\nCONVERSATION SUMMARY: ${conversationContext.longTermSummary}`;
+    }
+
+    // Add key facts
+    if (conversationContext.keyFacts.length > 0) {
+      systemPrompt += `\n\nKEY FACTS: ${conversationContext.keyFacts.join('; ')}`;
+    }
+
+    // Add recent conversation context
+    if (conversationContext.recentMessages.length > 0) {
+      const recentContext = conversationContext.recentMessages
+        .slice(-6) // Last 6 messages
+        .map(msg => `${msg.role.toUpperCase()}: ${msg.content}`)
+        .join('\n');
+      systemPrompt += `\n\nRECENT CONVERSATION:\n${recentContext}`;
+    }
+
+    // Add relevant medical knowledge
+    if (relevantKnowledge.length > 0) {
+      const knowledgeContext = relevantKnowledge
+        .map(kb => `${kb.title}: ${kb.text}`)
+        .join('\n\n');
+      systemPrompt += `\n\nRELEVANT MEDICAL KNOWLEDGE:\n${knowledgeContext}`;
+    }
 
     const response = await this.openAI.generateResponse(
       systemPrompt,
@@ -104,10 +156,34 @@ export class PatientAIAgent {
   private async analyzeSymptoms(message: AIAgentMessage): Promise<AIAgentMessage> {
     const symptoms = message.metadata?.symptoms || [];
     
-    const analysisPrompt = `Analyze the symptoms and produce a structured clinical triage with a probabilistic differential diagnosis.
-    Symptoms: ${symptoms.join(', ')}
+    // Get conversation context and relevant knowledge
+    const [conversationContext, relevantKnowledge] = await Promise.all([
+      this.memoryService.getFullConversationContext(message.fromUserId),
+      this.ragService.retrieveRelevant(symptoms.join(' '), message.fromUserId, 5)
+    ]);
 
-    Return STRICT JSON with keys:
+    let analysisPrompt = `Analyze the symptoms and produce a structured clinical triage with a probabilistic differential diagnosis.
+    Symptoms: ${symptoms.join(', ')}`;
+
+    // Add patient context to analysis
+    if (conversationContext.patientContext.profile) {
+      const profile = conversationContext.patientContext.profile;
+      analysisPrompt += `\n\nPatient Context:
+- Age: ${profile.age || 'Unknown'}, Gender: ${profile.gender || 'Unknown'}
+- Allergies: ${profile.allergies?.join(', ') || 'None'}
+- Current medications: ${profile.medications?.join(', ') || 'None'}
+- Chronic conditions: ${profile.chronicConditions?.join(', ') || 'None'}`;
+    }
+
+    // Add relevant medical knowledge
+    if (relevantKnowledge.length > 0) {
+      const knowledgeContext = relevantKnowledge
+        .map(kb => `${kb.title}: ${kb.text}`)
+        .join('\n\n');
+      analysisPrompt += `\n\nRelevant Medical Knowledge:\n${knowledgeContext}`;
+    }
+
+    analysisPrompt += `\n\nReturn STRICT JSON with keys:
     {
       "riskLevel": "low|medium|high|critical",
       "riskScore": 0-100,
@@ -123,12 +199,14 @@ export class PatientAIAgent {
     Rules:
     - Sum of differential probabilities should be ~1.0 (±0.05).
     - Prefer common conditions first; include serious but less likely ones only if warranted by symptoms.
-    - Map high/critical risk to urgent_consultation/emergency where appropriate.`;
+    - Map high/critical risk to urgent_consultation/emergency where appropriate.
+    - Consider patient age, gender, medications, and chronic conditions in your analysis.`;
 
     const analysisResult = await this.openAI.generateResponse(
-      'You are a medical triage AI. Analyze symptoms and provide structured risk assessment.',
+      'You are a medical triage AI. Analyze symptoms and provide structured risk assessment with patient context.',
       analysisPrompt,
-      message.fromUserId
+      message.fromUserId,
+      'smart'
     );
 
     let analysis: SymptomAnalysis;

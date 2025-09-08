@@ -170,7 +170,8 @@ router.get('/regional-trends', authenticateToken, async (req, res) => {
 
 // Helper functions
 async function getUserHealthData(userId: string) {
-  const [medicalRecords, appointments, patientProfile] = await Promise.all([
+  // Also pull recent AI chat messages to consider free-text symptoms in insights
+  const [medicalRecords, appointments, patientProfile, chatMessages] = await Promise.all([
     prisma.medicalRecord.findMany({
       where: { patientId: userId },
       orderBy: { date: 'desc' },
@@ -183,13 +184,25 @@ async function getUserHealthData(userId: string) {
     }),
     prisma.patientProfile.findUnique({
       where: { userId }
-    })
+    }),
+    // Use any-cast to be resilient if Prisma client types lag
+    (prisma as any).aIAgentMessage?.findMany ? (prisma as any).aIAgentMessage.findMany({
+      where: {
+        OR: [
+          { fromUserId: userId },
+          { toUserId: userId }
+        ]
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    }) : Promise.resolve([])
   ]);
 
   return {
     medicalRecords,
     appointments,
     patientProfile,
+    chatMessages,
     age: patientProfile ? calculateAge(patientProfile.dateOfBirth) : 30,
     gender: patientProfile?.gender || 'OTHER'
   };
@@ -235,6 +248,27 @@ async function generateHealthInsights(userData: any, userId: string) {
     }
   }
 
+  // Consider recent AI chat symptom mentions (lightweight heuristic)
+  const recentUserChats: string[] = (userData.chatMessages || [])
+    .filter((m: any) => m.fromUserId === userId)
+    .slice(0, 20)
+    .map((m: any) => String(m.content).toLowerCase());
+
+  if (recentUserChats.length > 0) {
+    const symptomKeywords = ['fever', 'cough', 'runny nose', 'shortness of breath', 'chest pain', 'headache', 'sore throat', 'fatigue'];
+    const hits = symptomKeywords.filter(k => recentUserChats.some(msg => msg.includes(k)));
+    if (hits.length >= 2) {
+      insights.push({
+        type: 'RECOMMENDATION',
+        title: 'Recent Symptoms Mentioned in Chat',
+        description: `You recently reported: ${hits.join(', ')}. Consider monitoring and using the symptom analysis tool if not done yet.`,
+        severity: 'INFO',
+        confidence: 0.7,
+        actionRequired: false
+      });
+    }
+  }
+
   // Age-based preventive care
   if (userData.age > 50) {
     insights.push({
@@ -266,7 +300,8 @@ Gender: ${userData.gender}
 Recent Appointments: ${userData.appointments.length}
 Medical Records: ${userData.medicalRecords.length}
 
-Recent symptoms: ${userData.medicalRecords.slice(0, 3).map((r: any) => r.symptoms.join(', ')).join('; ')}
+Recent symptoms (records): ${userData.medicalRecords.slice(0, 3).map((r: any) => (r.symptoms||[]).join(', ')).join('; ')}
+Recent chat notes: ${(userData.chatMessages||[]).slice(0,5).map((m:any)=>`"${String(m.content).slice(0,120)}"`).join(' | ')}
 
 Generate JSON array of insights with: type, title, description, severity, confidence, actionRequired
 

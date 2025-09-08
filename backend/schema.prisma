@@ -515,3 +515,49 @@ enum ProfileType {
   PATIENT
   DOCTOR
 }
+
+// AI Conversation Memory Models
+model AIMessage {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  role        AIMessageRole
+  content     String
+  messageType String   @default("text")
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation("AIMessageUser", fields: [userId], references: [id])
+  
+  @@map("ai_messages")
+}
+
+model AIConversationSummary {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  summary   String
+  keyFacts  String[] @default([])
+  updatedAt DateTime @updatedAt
+  
+  user      User     @relation(fields: [userId], references: [id])
+  
+  @@map("ai_conversation_summaries")
+}
+
+model AIKBVector {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  namespace String   @default("global")
+  docId     String
+  title     String
+  text      String
+  tags      String[] @default([])
+  vector    Float[]
+  createdAt DateTime @default(now())
+  
+  @@index([namespace, docId])
+  @@map("ai_kb_vectors")
+}
+
+enum AIMessageRole {
+  USER
+  AI
+}
