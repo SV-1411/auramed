@@ -35,8 +35,9 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
 
-  - type: static_site
+  - type: web
     name: auramed-frontend
+    env: static
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
