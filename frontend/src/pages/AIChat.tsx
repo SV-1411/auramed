@@ -75,12 +75,12 @@ const AIChat: React.FC = () => {
 
   const handleAIResponse = (data: any) => {
     const aiMessage: Message = {
-      id: data.message.id,
-      content: data.message.content,
+      id: data.message?.id || `ai_${Date.now()}`,
+      content: data.message?.content || data.content || 'AI response received',
       sender: 'ai',
       timestamp: new Date(),
-      messageType: data.message.messageType,
-      metadata: data.message.metadata
+      messageType: data.message?.messageType || data.messageType,
+      metadata: data.message?.metadata || data.metadata
     };
     
     setMessages(prev => [...prev, aiMessage]);

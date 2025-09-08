@@ -16,9 +16,9 @@ export class OpenAIService {
     
     // Configure different models for different use cases
     this.models = {
-      fast: 'google/gemini-2.0-flash-exp',      // Fast responses
-      smart: 'deepseek/deepseek-r1',            // Complex reasoning
-      creative: 'qwen/qwen-2.5-72b'             // Creative tasks
+      fast: 'openai/gpt-3.5-turbo',            // Fast responses
+      smart: 'openai/gpt-4o-mini',             // Complex reasoning
+      creative: 'anthropic/claude-3-haiku'     // Creative tasks
     };
     
     if (!this.apiKey) {

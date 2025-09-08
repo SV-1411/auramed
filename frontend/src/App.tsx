@@ -21,6 +21,8 @@ import FamilyProfile from './pages/FamilyProfile';
 import MultilingualSupport from './pages/MultilingualSupport';
 import PredictiveHealthInsights from './pages/PredictiveHealthInsights';
 import About from './pages/About';
+import AIAppointmentBooking from './pages/AIAppointmentBooking';
+import ConsultationChat from './pages/ConsultationChat';
 
 // Components
 import Navbar from './components/Navbar';
@@ -133,6 +135,18 @@ function AppWithAuth() {
                 <Route path="/predictive-insights" element={
                   <ProtectedRoute>
                     <PredictiveHealthInsights />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/ai-appointments" element={
+                  <ProtectedRoute>
+                    <AIAppointmentBooking />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/consultations/:consultationId" element={
+                  <ProtectedRoute>
+                    <ConsultationChat />
                   </ProtectedRoute>
                 } />
                 

@@ -23,6 +23,12 @@ export interface SymptomAnalysis {
   suggestedSpecialization?: string[];
   estimatedWaitTime?: number;
   aiConfidence: number;
+  differentials?: Array<{
+    condition: string;
+    probability: number; // 0..1
+    rationale?: string;
+    recommendedTests?: string[];
+  }>;
 }
 import { logger } from '../utils/logger';
 import { OpenAIService } from '../services/OpenAIService';
@@ -64,21 +70,23 @@ export class PatientAIAgent {
   }
 
   private async handleGeneralQuery(message: AIAgentMessage): Promise<AIAgentMessage> {
-    const systemPrompt = `You are a Patient AI Agent for AuraMed healthcare platform. Your role is to:
-    1. Collect patient symptoms and health information
-    2. Provide initial health guidance and triage
-    3. Book appointments with appropriate doctors
-    4. Handle payment processing
-    5. Send medication and appointment reminders
-    6. Maintain empathetic, professional communication
-    
-    Always prioritize patient safety. For emergency symptoms, immediately recommend urgent consultation.
-    Keep responses concise but caring. Ask follow-up questions to gather complete symptom information.`;
+    const systemPrompt = `You are the AuraMed Patient AI Agent. Behave like a clinician performing triage and preliminary differential diagnosis.
+    Goals:
+    - Extract symptoms and key history (onset, duration, severity, associated symptoms, fever, travel, contacts, meds, chronic conditions)
+    - Provide a differential diagnosis with probabilities (must sum ~1.0)
+    - Provide triage level and clear next action
+    - Only recommend in-person checkup or urgent care when the risk warrants it; otherwise provide at‑home guidance
+    - Be concise, empathetic, and evidence‑oriented. Avoid generic disclaimers; include concrete, actionable steps
+
+    Output style:
+    - If the user message contains symptoms, include a short differential and triage guidance in the answer itself.
+    - Ask 2-4 targeted follow‑ups if uncertainty is high.`;
 
     const response = await this.openAI.generateResponse(
       systemPrompt,
       message.content,
-      message.fromUserId
+      message.fromUserId,
+      'smart'
     );
 
     return {
@@ -96,17 +104,26 @@ export class PatientAIAgent {
   private async analyzeSymptoms(message: AIAgentMessage): Promise<AIAgentMessage> {
     const symptoms = message.metadata?.symptoms || [];
     
-    const analysisPrompt = `Analyze these symptoms and provide a risk assessment:
+    const analysisPrompt = `Analyze the symptoms and produce a structured clinical triage with a probabilistic differential diagnosis.
     Symptoms: ${symptoms.join(', ')}
-    
-    Provide:
-    1. Risk level (low/medium/high/critical)
-    2. Risk score (0-100)
-    3. Recommended action
-    4. Suggested medical specialization if needed
-    5. Urgency level
-    
-    Format as JSON with fields: riskLevel, riskScore, recommendedAction, specialization, urgency, explanation`;
+
+    Return STRICT JSON with keys:
+    {
+      "riskLevel": "low|medium|high|critical",
+      "riskScore": 0-100,
+      "recommendedAction": "self_care|schedule_appointment|urgent_consultation|emergency",
+      "specialization": ["string"],
+      "urgency": "routine|urgent|emergency",
+      "explanation": "short rationale",
+      "differentials": [
+        { "condition": "string", "probability": 0.0-1.0, "rationale": "string", "recommendedTests": ["string"] }
+      ],
+      "aiConfidence": 0.0-1.0
+    }
+    Rules:
+    - Sum of differential probabilities should be ~1.0 (±0.05).
+    - Prefer common conditions first; include serious but less likely ones only if warranted by symptoms.
+    - Map high/critical risk to urgent_consultation/emergency where appropriate.`;
 
     const analysisResult = await this.openAI.generateResponse(
       'You are a medical triage AI. Analyze symptoms and provide structured risk assessment.',
@@ -126,9 +143,10 @@ export class PatientAIAgent {
           aiRecommendation: parsed.explanation
         },
         recommendedAction: parsed.recommendedAction,
-        suggestedSpecialization: parsed.specialization ? [parsed.specialization] : undefined,
+        suggestedSpecialization: Array.isArray(parsed.specialization) ? parsed.specialization : (parsed.specialization ? [parsed.specialization] : undefined),
         estimatedWaitTime: this.calculateWaitTime(parsed.riskLevel),
-        aiConfidence: 0.85
+        aiConfidence: typeof parsed.aiConfidence === 'number' ? parsed.aiConfidence : 0.85,
+        differentials: Array.isArray(parsed.differentials) ? parsed.differentials : undefined
       };
     } catch (error) {
       // Fallback analysis
@@ -141,7 +159,13 @@ export class PatientAIAgent {
           aiRecommendation: 'Please consult with a healthcare provider for proper evaluation.'
         },
         recommendedAction: 'schedule_appointment',
-        aiConfidence: 0.6
+        aiConfidence: 0.6,
+        differentials: [
+          { condition: 'Common cold (viral URTI)', probability: 0.5, rationale: 'Cough + runny nose + headache', recommendedTests: [] },
+          { condition: 'Allergic rhinitis', probability: 0.25, rationale: 'Runny nose predominant; possible seasonal trigger', recommendedTests: [] },
+          { condition: 'Influenza', probability: 0.15, rationale: 'Headache + systemic symptoms if fever present', recommendedTests: [] },
+          { condition: 'Sinusitis', probability: 0.1, rationale: 'Headache with nasal symptoms if prolonged', recommendedTests: [] }
+        ]
       };
     }
 
@@ -251,28 +275,36 @@ export class PatientAIAgent {
   }
 
   private formatSymptomAnalysisResponse(analysis: SymptomAnalysis): string {
-    const { riskScore, recommendedAction, estimatedWaitTime } = analysis;
-    
-    let response = `🔍 **Symptom Analysis Complete**\n\n`;
-    response += `**Risk Level:** ${riskScore.level.toUpperCase()}\n`;
-    response += `**Risk Score:** ${riskScore.score}/100\n\n`;
-    response += `**Recommendation:** ${riskScore.aiRecommendation}\n\n`;
-    
+    const { riskScore, recommendedAction, estimatedWaitTime, differentials } = analysis;
+
+    let response = `🔍 Differential Diagnosis (probabilities)\n`;
+    if (differentials && differentials.length) {
+      const top = [...differentials]
+        .sort((a,b) => (b.probability ?? 0) - (a.probability ?? 0))
+        .slice(0, 4)
+        .map(d => `• ${d.condition}: ${(Math.round((d.probability || 0) * 100))}%${d.rationale ? ` — ${d.rationale}` : ''}`)
+        .join('\n');
+      response += top + '\n\n';
+    }
+
+    response += `Risk: ${riskScore.level.toUpperCase()} (${riskScore.score}/100)\n`;
+    response += `Plan: ${riskScore.aiRecommendation}\n\n`;
+
     switch (recommendedAction) {
       case 'emergency':
-        response += `🚨 **URGENT:** Please seek immediate emergency care or call emergency services.`;
+        response += `🚨 Action: Immediate emergency care is recommended.`;
         break;
       case 'urgent_consultation':
-        response += `⚡ **High Priority:** I'm booking you an urgent consultation. Expected wait time: ${estimatedWaitTime} minutes.`;
+        response += `⚡ Action: Urgent tele-consultation recommended (≈ ${estimatedWaitTime} min).`;
         break;
       case 'schedule_appointment':
-        response += `📅 **Schedule Appointment:** I recommend booking a consultation. Would you like me to find available doctors?`;
+        response += `📅 Action: Schedule a routine consultation. I can find available doctors now.`;
         break;
       case 'self_care':
-        response += `🏠 **Self Care:** Your symptoms appear manageable with self-care. Monitor your condition and seek care if symptoms worsen.`;
+        response += `🏠 Action: Self‑care appropriate. Monitor symptoms; escalate if red flags appear.`;
         break;
     }
-    
+
     return response;
   }
 

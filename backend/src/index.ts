@@ -29,6 +29,8 @@ import familyRoutes from './routes/family';
 import healthInsightsRoutes from './routes/health-insights';
 import translationRoutes from './routes/translation';
 import { router as predictiveInsightsRoutes } from './routes/predictive-insights';
+import aiAppointmentRoutes from './routes/ai-appointment';
+import consultationRoutes from './routes/consultation';
 
 // AI Agents
 import { PatientAIAgent } from './agents/PatientAIAgent';
@@ -88,6 +90,8 @@ app.use('/api/family-members', familyRoutes); // Fix: Change to match frontend e
 app.use('/api/health-insights', healthInsightsRoutes);
 app.use('/api/translation', translationRoutes);
 app.use('/api/predictive-insights', predictiveInsightsRoutes);
+app.use('/api/ai-appointments', aiAppointmentRoutes);
+app.use('/api/consultations', consultationRoutes);
 
 // Error handling
 app.use(errorHandler);

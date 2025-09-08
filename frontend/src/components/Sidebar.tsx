@@ -9,6 +9,8 @@ import {
   Activity,
   Languages,
   User as UserIcon,
+  Stethoscope,
+  AlertTriangle
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,6 +22,7 @@ const navItems = [
   { name: 'Dashboard', href: '/dashboard', Icon: LayoutDashboard },
   { name: 'AI Chat', href: '/ai-chat', Icon: MessageSquare },
   { name: 'Appointments', href: '/appointments', Icon: CalendarDays },
+  { name: 'Find Doctor', href: '/ai-appointments', Icon: Stethoscope, badge: 'AI' },
   { name: 'Video Call', href: '/video-consultation', Icon: Video },
   { name: 'Family', href: '/family', Icon: Users },
   { name: 'AI Insights', href: '/predictive-insights', Icon: Activity },
@@ -51,7 +54,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
                   title={name}
                 >
                   <Icon className="w-5 h-5 shrink-0" />
-                  {isOpen && <span className="whitespace-nowrap">{name}</span>}
+                  {isOpen && (
+                    <span className="whitespace-nowrap flex items-center gap-2">
+                      {name}
+                      {'badge' in (navItems.find(n => n.href === href) || {}) && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">AI</span>
+                      )}
+                    </span>
+                  )}
                 </Link>
               </li>
             );

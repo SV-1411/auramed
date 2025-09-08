@@ -37,6 +37,13 @@ model User {
   doctorConsultations VideoConsultation[] @relation("DoctorConsultations")
   healthInsights   HealthInsight[]
   auditLogs        AuditLog[]
+  consultationsAsPatient Consultation[] @relation("PatientConsultations")
+  consultationsAsDoctor  Consultation[] @relation("DoctorConsultations")
+  consultationMessages   ConsultationMessage[] @relation("ConsultationMessageSender")
+  aiProfiles             AIProfile[] @relation("AIProfileUser")
+  patientReviews         DoctorReview[] @relation("PatientReviews")
+  aiMessages             AIMessage[] @relation("AIMessageUser")
+  aiConversationSummary  AIConversationSummary?
 
   @@map("users")
 }
@@ -74,6 +81,8 @@ model DoctorProfile {
   user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   availabilitySlots AvailabilitySlot[]
   qualityMetrics    DoctorQualityMetrics?
+  reviews           DoctorReview[] @relation("DoctorReviews")
+  location          Json? // {latitude: number, longitude: number, address: string}
   
   @@map("doctor_profiles")
 }
@@ -176,6 +185,7 @@ model Appointment {
   doctor            User                @relation("DoctorAppointments", fields: [doctorId], references: [id])
   payments          PaymentTransaction[]
   videoConsultation VideoConsultation?
+  consultation      Consultation?
   
   @@map("appointments")
 }
@@ -317,6 +327,91 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model Consultation {
+  id            String                @id @default(auto()) @map("_id") @db.ObjectId
+  appointmentId String                @unique @db.ObjectId
+  patientId     String                @db.ObjectId
+  doctorId      String                @db.ObjectId
+  status        ConsultationStatus    @default(ACTIVE)
+  startedAt     DateTime              @default(now())
+  completedAt   DateTime?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  
+  appointment Appointment             @relation(fields: [appointmentId], references: [id])
+  patient     User                    @relation("PatientConsultations", fields: [patientId], references: [id])
+  doctor      User                    @relation("DoctorConsultations", fields: [doctorId], references: [id])
+  messages    ConsultationMessage[]
+  summary     ConsultationSummary?
+  
+  @@map("consultations")
+}
+
+model ConsultationMessage {
+  id             String      @id @default(auto()) @map("_id") @db.ObjectId
+  consultationId String      @db.ObjectId
+  senderId       String      @db.ObjectId
+  content        String
+  messageType    MessageType @default(TEXT)
+  timestamp      DateTime    @default(now())
+  isRead         Boolean     @default(false)
+  
+  consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("ConsultationMessageSender", fields: [senderId], references: [id])
+  
+  @@map("consultation_messages")
+}
+
+model ConsultationSummary {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  consultationId String   @unique @db.ObjectId
+  doctorSummary  String
+  patientSummary String
+  keyPoints      String[]
+  recommendations String[]
+  prescriptions  String[] @default([])
+  followUpRequired Boolean @default(false)
+  diagnosis      String?
+  treatmentPlan  String?
+  currentStatus  String?
+  isComplete     Boolean  @default(false)
+  generatedAt    DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  
+  @@map("consultation_summaries")
+}
+
+model AIProfile {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  appointmentId String      @db.ObjectId
+  userId        String      @db.ObjectId
+  profileType   ProfileType
+  aiSummary     String
+  visibleTo     String      @db.ObjectId
+  generatedAt   DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  user User @relation("AIProfileUser", fields: [userId], references: [id])
+  
+  @@map("ai_profiles")
+}
+
+model DoctorReview {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  doctorProfileId  String   @db.ObjectId
+  patientId        String   @db.ObjectId
+  rating           Float
+  comment          String?
+  createdAt        DateTime @default(now())
+
+  doctor  DoctorProfile @relation("DoctorReviews", fields: [doctorProfileId], references: [id])
+  patient User          @relation("PatientReviews", fields: [patientId], references: [id])
+
+  @@map("doctor_reviews")
+}
+
 // Enums
 enum UserRole {
   PATIENT
@@ -378,6 +473,10 @@ enum MessageType {
   APPOINTMENT_BOOKING
   PRESCRIPTION
   ALERT
+  IMAGE
+  FILE
+  SYSTEM
+  AI_SUMMARY
 }
 
 enum VideoConsultationStatus {
@@ -404,4 +503,15 @@ enum AlertType {
   COMPLIANCE_VIOLATION
   SYSTEM_ERROR
   PERFORMANCE_ISSUE
+}
+
+enum ConsultationStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ProfileType {
+  PATIENT
+  DOCTOR
 }

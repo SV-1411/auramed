@@ -30,6 +30,41 @@ export class NotificationService {
     this.setupTwilioClient();
   }
 
+  async notifyDoctorNewAppointment(doctorId: string, appointment: Appointment): Promise<void> {
+    try {
+      const doctor = await this.prisma.user.findUnique({
+        where: { id: doctorId },
+        include: { doctorProfile: true }
+      });
+
+      if (!doctor) return;
+
+      const patient = await this.prisma.user.findUnique({
+        where: { id: appointment.patientId },
+        include: { patientProfile: true }
+      });
+
+      const message = `New appointment booked for ${appointment.scheduledAt.toLocaleString()} by ${patient?.patientProfile?.firstName ?? 'Patient'} ${patient?.patientProfile?.lastName ?? ''}. Appointment ID: ${appointment.id}`;
+
+      if (doctor.email) {
+        await this.sendEmail(
+          doctor.email,
+          'New Appointment Booked - AuraMed',
+          message
+        );
+      }
+
+      if (doctor.phone) {
+        await this.sendSMS(doctor.phone, message);
+      }
+
+      await this.sendPushNotification(doctorId, 'New Appointment Booked', message);
+
+    } catch (error) {
+      logger.error('Failed to notify doctor of new appointment:', error);
+    }
+  }
+
   private setupEmailTransporter() {
     this.emailTransporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
