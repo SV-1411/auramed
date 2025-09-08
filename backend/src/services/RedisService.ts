@@ -32,8 +32,8 @@ export class RedisService {
       ]);
       logger.info('Redis connected successfully');
     } catch (error) {
-      logger.error('Redis connection failed:', error);
-      throw error;
+      logger.warn('Redis connection failed - running without Redis cache:', error);
+      // Don't throw error to allow app to continue without Redis
     }
   }
 
@@ -230,15 +230,15 @@ export class RedisService {
 
   private setupErrorHandlers(): void {
     this.client.on('error', (error) => {
-      logger.error('Redis client error:', error);
+      logger.warn('Redis client error (continuing without Redis):', { code: error.code, service: 'auramed-backend', stack: error.stack, timestamp: new Date().toISOString() });
     });
 
     this.subscriber.on('error', (error) => {
-      logger.error('Redis subscriber error:', error);
+      logger.warn('Redis subscriber error (continuing without Redis):', { code: error.code, service: 'auramed-backend', stack: error.stack, timestamp: new Date().toISOString() });
     });
 
     this.publisher.on('error', (error) => {
-      logger.error('Redis publisher error:', error);
+      logger.warn('Redis publisher error (continuing without Redis):', { code: error.code, service: 'auramed-backend', stack: error.stack, timestamp: new Date().toISOString() });
     });
   }
 

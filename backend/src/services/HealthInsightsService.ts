@@ -13,7 +13,7 @@ export interface HealthMetric {
 }
 
 export interface HealthInsight {
-  id: string;
+  id?: string;
   patientId: string;
   type: 'risk_alert' | 'improvement' | 'recommendation' | 'trend_analysis' | 'preventive_care';
   title: string;
@@ -78,21 +78,13 @@ export class HealthInsightsService {
       const preventiveInsights = await this.generatePreventiveCareInsights(patient);
       insights.push(...preventiveInsights);
 
-      // Store insights in database (conform to HealthInsight schema)
+      // Persist insights – let Prisma generate ObjectIds to avoid invalid id errors
       for (const insight of insights) {
-        await prisma.healthInsight.upsert({
-          where: { id: insight.id },
-          create: {
-            id: insight.id,
+        await prisma.healthInsight.create({
+          data: {
             patientId: insight.patientId,
             type: this.mapInsightType(insight.type),
             title: insight.title,
-            description: insight.description,
-            severity: this.mapSeverity(insight.severity),
-            actionRequired: insight.actionRequired,
-            confidence: 0.8
-          },
-          update: {
             description: insight.description,
             severity: this.mapSeverity(insight.severity),
             actionRequired: insight.actionRequired,
@@ -119,7 +111,7 @@ export class HealthInsightsService {
 
     if (appointments.length === 0) {
       insights.push({
-        id: `${patient.id}-no-appointments`,
+        // id intentionally omitted so Prisma auto-generates a valid ObjectId
         patientId: patient.id,
         type: 'recommendation',
         title: 'Schedule Regular Check-up',
@@ -145,7 +137,7 @@ export class HealthInsightsService {
 
     if (daysSinceLastAppointment > 365) {
       insights.push({
-        id: `${patient.id}-overdue-checkup`,
+        // id intentionally omitted so Prisma auto-generates a valid ObjectId
         patientId: patient.id,
         type: 'recommendation',
         title: 'Annual Check-up Overdue',
@@ -177,7 +169,7 @@ export class HealthInsightsService {
     
     if (chronicConditions.includes('diabetes') || chronicConditions.includes('pre-diabetes')) {
       insights.push({
-        id: `${patient.id}-diabetes-management`,
+        // id intentionally omitted so Prisma auto-generates a valid ObjectId
         patientId: patient.id,
         type: 'risk_alert',
         title: 'Diabetes Management',
@@ -198,7 +190,7 @@ export class HealthInsightsService {
 
     if (chronicConditions.includes('hypertension') || chronicConditions.includes('high blood pressure')) {
       insights.push({
-        id: `${patient.id}-hypertension-management`,
+        // id intentionally omitted so Prisma auto-generates a valid ObjectId
         patientId: patient.id,
         type: 'risk_alert',
         title: 'Blood Pressure Management',
@@ -233,7 +225,7 @@ export class HealthInsightsService {
     // Age-based screening recommendations
     if (age >= 40) {
       insights.push({
-        id: `${patient.id}-annual-screening`,
+        // id intentionally omitted so Prisma auto-generates a valid ObjectId
         patientId: patient.id,
         type: 'preventive_care',
         title: 'Annual Health Screening',
@@ -255,7 +247,7 @@ export class HealthInsightsService {
 
     if (age >= 50) {
       insights.push({
-        id: `${patient.id}-cancer-screening`,
+        // id intentionally omitted so Prisma auto-generates a valid ObjectId
         patientId: patient.id,
         type: 'preventive_care',
         title: 'Cancer Screening Recommendations',
@@ -276,7 +268,7 @@ export class HealthInsightsService {
 
     // Vaccination reminders
     insights.push({
-      id: `${patient.id}-vaccination-reminder`,
+      // id intentionally omitted so Prisma auto-generates a valid ObjectId
       patientId: patient.id,
       type: 'preventive_care',
       title: 'Vaccination Status',

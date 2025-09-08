@@ -6,12 +6,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   email     String   @unique
   phone     String   @unique
   password  String
@@ -42,8 +42,8 @@ model User {
 }
 
 model PatientProfile {
-  id               String   @id @default(cuid())
-  userId           String   @unique
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String   @unique @db.ObjectId
   firstName        String
   lastName         String
   dateOfBirth      DateTime
@@ -58,8 +58,8 @@ model PatientProfile {
 }
 
 model DoctorProfile {
-  id              String   @id @default(cuid())
-  userId          String   @unique
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @unique @db.ObjectId
   firstName       String
   lastName        String
   licenseNumber   String   @unique
@@ -79,8 +79,8 @@ model DoctorProfile {
 }
 
 model AdminProfile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @unique @db.ObjectId
   firstName   String
   lastName    String
   department  String
@@ -92,11 +92,21 @@ model AdminProfile {
 }
 
 model FamilyMember {
-  id              String    @id @default(cuid())
-  patientId       String
-  name            String
-  relationship    String
-  dateOfBirth     DateTime
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  patientId         String    @db.ObjectId
+  firstName         String
+  lastName          String
+  relationship      String
+  dateOfBirth       DateTime
+  gender            Gender    @default(OTHER)
+  phone             String?
+  emergencyContact  String?
+  medicalHistory    String[]  @default([])
+  allergies         String[]  @default([])
+  currentMedications String[] @default([])
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   
   patient         PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
   medicalRecords  MedicalRecord[]
@@ -105,10 +115,10 @@ model FamilyMember {
 }
 
 model MedicalRecord {
-  id               String      @id @default(cuid())
-  patientId        String
-  doctorId         String?
-  familyMemberId   String?
+  id               String      @id @default(auto()) @map("_id") @db.ObjectId
+  patientId        String      @db.ObjectId
+  doctorId         String?     @db.ObjectId
+  familyMemberId   String?     @db.ObjectId
   date             DateTime    @default(now())
   symptoms         String[]
   diagnosis        String
@@ -129,8 +139,8 @@ model MedicalRecord {
 }
 
 model Prescription {
-  id               String @id @default(cuid())
-  medicalRecordId  String
+  id               String @id @default(auto()) @map("_id") @db.ObjectId
+  medicalRecordId  String @db.ObjectId
   medicationName   String
   genericName      String?
   dosage           String
@@ -146,9 +156,9 @@ model Prescription {
 }
 
 model Appointment {
-  id              String            @id @default(cuid())
-  patientId       String
-  doctorId        String
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  patientId       String            @db.ObjectId
+  doctorId        String            @db.ObjectId
   scheduledAt     DateTime
   duration        Int               @default(30)
   type            AppointmentType
@@ -171,8 +181,8 @@ model Appointment {
 }
 
 model AvailabilitySlot {
-  id          String  @id @default(cuid())
-  doctorId    String
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  doctorId    String  @db.ObjectId
   dayOfWeek   Int     // 0-6 (Sunday-Saturday)
   startTime   String  // HH:MM format
   endTime     String  // HH:MM format
@@ -184,10 +194,10 @@ model AvailabilitySlot {
 }
 
 model AIAgentMessage {
-  id          String      @id @default(cuid())
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
   agentType   AgentType
-  fromUserId  String
-  toUserId    String?
+  fromUserId  String      @db.ObjectId
+  toUserId    String?     @db.ObjectId
   content     String
   messageType MessageType
   metadata    Json?
@@ -201,9 +211,9 @@ model AIAgentMessage {
 }
 
 model PaymentTransaction {
-  id                  String        @id @default(cuid())
-  appointmentId       String
-  patientId           String
+  id                  String        @id @default(auto()) @map("_id") @db.ObjectId
+  appointmentId       String        @db.ObjectId
+  patientId           String        @db.ObjectId
   amount              Float
   currency            String        @default("INR")
   method              PaymentMethod
@@ -220,16 +230,16 @@ model PaymentTransaction {
 }
 
 model VideoConsultation {
-  id            String                    @id @default(cuid())
-  appointmentId String                    @unique
+  id            String                    @id @default(auto()) @map("_id") @db.ObjectId
+  appointmentId String                    @unique @db.ObjectId
   roomId        String                    @unique
   accessToken   String
   status        VideoConsultationStatus   @default(WAITING)
   startedAt     DateTime?
   endedAt       DateTime?
   recordingUrl  String?
-  patientId     String
-  doctorId      String
+  patientId     String                    @db.ObjectId
+  doctorId      String                    @db.ObjectId
   patientJoined Boolean                   @default(false)
   doctorJoined  Boolean                   @default(false)
   createdAt     DateTime                  @default(now())
@@ -242,8 +252,8 @@ model VideoConsultation {
 }
 
 model DoctorQualityMetrics {
-  id                   String   @id @default(cuid())
-  doctorId             String   @unique
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  doctorId             String   @unique @db.ObjectId
   totalConsultations   Int      @default(0)
   averageRating        Float    @default(0)
   diagnosticAccuracy   Float    @default(0)
@@ -259,8 +269,8 @@ model DoctorQualityMetrics {
 }
 
 model HealthInsight {
-  id             String      @id @default(cuid())
-  patientId      String
+  id             String      @id @default(auto()) @map("_id") @db.ObjectId
+  patientId      String      @db.ObjectId
   type           InsightType
   title          String
   description    String
@@ -276,7 +286,7 @@ model HealthInsight {
 }
 
 model SystemAlert {
-  id             String      @id @default(cuid())
+  id             String      @id @default(auto()) @map("_id") @db.ObjectId
   type           AlertType
   severity       Severity
   title          String
@@ -292,8 +302,8 @@ model SystemAlert {
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String?
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String?  @db.ObjectId
   action    String
   entity    String
   entityId  String

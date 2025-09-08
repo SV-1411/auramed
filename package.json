@@ -18,7 +18,13 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down"
   },
-  "keywords": ["healthcare", "ai", "agents", "telemedicine", "symptom-checker"],
+  "keywords": [
+    "healthcare",
+    "ai",
+    "agents",
+    "telemedicine",
+    "symptom-checker"
+  ],
   "author": "Shivansh Verma",
   "license": "MIT",
   "devDependencies": {
@@ -28,5 +34,8 @@
     "backend",
     "frontend",
     "shared"
-  ]
+  ],
+  "dependencies": {
+    "rxjs": "^7.8.2"
+  }
 }

@@ -78,8 +78,8 @@ router.post('/', authenticateToken, [
       }
     });
 
-    // Add to emergency queue if urgent
-    if (type === 'EMERGENCY' || riskLevel === 'HIGH') {
+    // Add to emergency queue if urgent (skip if Redis not available)
+    if ((type === 'EMERGENCY' || riskLevel === 'HIGH') && redis) {
       await redis.addToEmergencyQueue(patientId, riskLevel);
     }
 
@@ -338,7 +338,7 @@ router.get('/doctors/available', authenticateToken, async (req: Request, res: Re
 router.get('/emergency/queue', authenticateToken, requireRole(['ADMIN', 'DOCTOR']), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const redis = getRedis();
-    const queueSize = await redis.getEmergencyQueueSize();
+    const queueSize = redis ? await redis.getEmergencyQueueSize() : 0;
     
     res.json({
       status: 'success',

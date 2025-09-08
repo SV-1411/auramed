@@ -128,6 +128,18 @@ class DrugInteractionChecker:
                 "risk_level": "unknown"
             }
     
+    async def check_interactions(self, medications: List[str], patient_age: Optional[int] = None,
+                                 patient_conditions: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Compatibility wrapper for existing check_drug_interactions (main.py expectation)."""
+        result = await self.check_drug_interactions(medications)
+        # Basic mapping; warnings not implemented in core logic yet.
+        return {
+            "interactions": result["interactions"],
+            "warnings": [],
+            "severity_level": result["risk_level"],
+            "recommendations": result["recommendations"]
+        }
+
     async def _check_pair_interaction(self, drug1: str, drug2: str) -> Optional[Dict[str, Any]]:
         """Check interaction between two specific drugs"""
         # Check if drug1 has interactions with drug2

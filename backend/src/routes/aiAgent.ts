@@ -11,10 +11,19 @@ import { AdminAIAgent } from '../agents/AdminAIAgent';
 
 const router = express.Router();
 
-// Initialize AI agents
-const patientAgent = new PatientAIAgent();
-const doctorAgent = new DoctorAIAgent();
-const adminAgent = new AdminAIAgent();
+// Lazy-loaded AI agents
+let patientAgent: PatientAIAgent;
+let doctorAgent: DoctorAIAgent;
+let adminAgent: AdminAIAgent;
+
+function getAgents() {
+  if (!patientAgent) {
+    patientAgent = new PatientAIAgent();
+    doctorAgent = new DoctorAIAgent();
+    adminAgent = new AdminAIAgent();
+  }
+  return { patientAgent, doctorAgent, adminAgent };
+}
 
 // Chat with AI agent
 router.post('/chat', authenticateToken, [
@@ -35,10 +44,12 @@ router.post('/chat', authenticateToken, [
     const db = getDatabase();
     const redis = getRedis();
 
-    // Rate limiting check
-    const canProceed = await redis.checkRateLimit(userId, 'ai_chat', 50, 3600); // 50 messages per hour
-    if (!canProceed) {
-      throw createError('Rate limit exceeded. Please try again later.', 429);
+    // Rate limiting check (skip if Redis not available)
+    if (redis) {
+      const canProceed = await redis.checkRateLimit(userId, 'ai_chat', 50, 3600); // 50 messages per hour
+      if (!canProceed) {
+        throw createError('Rate limit exceeded. Please try again later.', 429);
+      }
     }
 
     // Create AI message
@@ -67,6 +78,7 @@ router.post('/chat', authenticateToken, [
     });
 
     // Route to appropriate AI agent
+    const { patientAgent, doctorAgent, adminAgent } = getAgents();
     let response;
     switch (userRole) {
       case 'PATIENT':
@@ -164,8 +176,11 @@ router.post('/analyze-symptoms', authenticateToken, [
     const { symptoms, patientHistory } = req.body;
     const redis = getRedis();
 
-    // Check cache first
-    const cachedAnalysis = await redis.getPatientSymptomsCache(userId);
+    // Check cache first (skip if Redis not available)
+    let cachedAnalysis = null;
+    if (redis) {
+      cachedAnalysis = await redis.getPatientSymptomsCache(userId);
+    }
     if (cachedAnalysis && JSON.stringify(cachedAnalysis.symptoms) === JSON.stringify(symptoms)) {
       return res.json({
         status: 'success',
@@ -191,8 +206,8 @@ router.post('/analyze-symptoms', authenticateToken, [
     // Process with Patient AI Agent
     const response = await patientAgent.processMessage(aiMessage);
 
-    // Cache the analysis
-    if (response.metadata?.analysis) {
+    // Cache the analysis (skip if Redis not available)
+    if (redis && response.metadata?.analysis) {
       await redis.cachePatientSymptoms(userId, symptoms, response.metadata.analysis);
     }
 
@@ -290,7 +305,10 @@ router.get('/system-alerts', authenticateToken, async (req: Request, res: Respon
     }
 
     const redis = getRedis();
-    const alerts = await redis.getActiveAlerts();
+    let alerts: any[] = [];
+    if (redis) {
+      alerts = await redis.getActiveAlerts();
+    }
 
     res.json({
       status: 'success',

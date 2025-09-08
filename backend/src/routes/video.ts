@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { PrismaClient, VideoConsultationStatus, AppointmentStatus } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
@@ -7,11 +7,22 @@ import twilio from 'twilio';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+// Initialize Twilio client (optional for prototype)
+let twilioClient: any = null;
+try {
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && 
+      process.env.TWILIO_ACCOUNT_SID.startsWith('AC')) {
+    twilioClient = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+    logger.info('Twilio client initialized successfully');
+  } else {
+    logger.warn('Twilio credentials not configured or invalid - video features disabled');
+  }
+} catch (error) {
+  logger.warn('Failed to initialize Twilio client:', error);
+}
 
 // Generate video consultation room
 router.post('/create-room', authenticateToken, async (req, res) => {
@@ -36,6 +47,18 @@ router.post('/create-room', authenticateToken, async (req, res) => {
 
     if (!appointment) {
       return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    // Check if Twilio is available
+    if (!twilioClient) {
+      return res.status(503).json({ 
+        error: 'Video consultation service not available - Twilio not configured',
+        mockRoom: {
+          sid: `mock_room_${appointmentId}`,
+          uniqueName: `consultation_${appointmentId}`,
+          status: 'in-progress'
+        }
+      });
     }
 
     // Create Twilio video room
@@ -252,7 +275,7 @@ router.get('/recordings/:appointmentId', authenticateToken, async (req, res) => 
     res.json({
       success: true,
       data: {
-        recordings: recordings.map(recording => ({
+        recordings: recordings.map((recording: any) => ({
           sid: recording.sid,
           status: recording.status,
           dateCreated: recording.dateCreated,

@@ -83,6 +83,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Configure axios defaults
   useEffect(() => {
+    // Set base URL for all axios requests
+    const apiUrl = (import.meta as any)?.env?.VITE_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    axios.defaults.baseURL = apiUrl;
+    
     if (state.token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${state.token}`;
     } else {
@@ -121,22 +125,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       dispatch({ type: 'AUTH_START' });
-      
+
       const response = await axios.post('/api/auth/login', {
         email,
         password,
       });
 
       const { user, token } = response.data.data;
-      
+
       localStorage.setItem('token', token);
-      
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: { user, token },
       });
 
-      toast.success(`Welcome back, ${user.profile.firstName}!`);
+      toast.success(`Welcome back, ${user.profile.firstName}! Session will persist until you log out.`);
     } catch (error: any) {
       dispatch({ type: 'AUTH_FAILURE' });
       const message = error.response?.data?.message || 'Login failed';
@@ -149,7 +153,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       dispatch({ type: 'AUTH_START' });
       
-      const response = await axios.post('/api/auth/register', userData);
+            // Transform fields to match backend expectations
+      const payload: any = { ...userData, phone: userData.phoneNumber, emergencyContact: userData.phoneNumber };
+      delete payload.phoneNumber;
+      delete payload.confirmPassword;
+      if (payload.role && typeof payload.role === 'string') {
+        payload.role = payload.role.toUpperCase();
+      }
+
+      const response = await axios.post('/api/auth/register', payload);
       
       const { user, token } = response.data.data;
       
@@ -160,7 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         payload: { user, token },
       });
 
-      toast.success(`Welcome to AuraMed, ${user.profile.firstName}!`);
+      toast.success(`Welcome to AuraMed, ${user.profile.firstName}! Your session will persist until you log out.`);
     } catch (error: any) {
       dispatch({ type: 'AUTH_FAILURE' });
       const message = error.response?.data?.message || 'Registration failed';
@@ -171,10 +183,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await axios.post('/api/auth/logout');
+      // Clear token and state immediately to prevent further requests
+      localStorage.removeItem('token');
+      dispatch({ type: 'LOGOUT' });
+      
+      // Then attempt API logout (but don't wait for it)
+      axios.post('/api/auth/logout').catch(() => {
+        // Ignore errors - user is already logged out locally
+      });
+      
+      toast.success('Logged out successfully');
     } catch (error) {
-      // Continue with logout even if API call fails
-    } finally {
+      // Always complete logout even if API call fails
       localStorage.removeItem('token');
       dispatch({ type: 'LOGOUT' });
       toast.success('Logged out successfully');

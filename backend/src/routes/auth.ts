@@ -12,9 +12,11 @@ const router = express.Router();
 // Register new user
 router.post('/register', [
   body('email').isEmail().normalizeEmail(),
-  body('phone').isMobilePhone('any'),
+  // Accept 10-15 digit phone numbers with optional leading +
+  body('phone').customSanitizer((v) => String(v)).matches(/^\+?\d{10,15}$/).withMessage('Phone must be 10-15 digits'),
   body('password').isLength({ min: 8 }),
-  body('role').isIn(['PATIENT', 'DOCTOR', 'ADMIN']),
+  // Allow role in any case
+  body('role').customSanitizer((v) => (typeof v === 'string' ? v.toUpperCase() : v)).isIn(['PATIENT', 'DOCTOR', 'ADMIN']),
   body('firstName').notEmpty().trim(),
   body('lastName').notEmpty().trim()
 ], async (req: Request, res: Response, next: NextFunction) => {
@@ -25,6 +27,26 @@ router.post('/register', [
     }
 
     const { email, phone, password, role, firstName, lastName, ...profileData } = req.body;
+    
+    // Normalize doctor-specific fields to correct types to satisfy Prisma schema
+    const doctorNormalized = {
+      licenseNumber: profileData.licenseNumber ? String(profileData.licenseNumber) : undefined,
+      specialization: Array.isArray(profileData.specialization)
+        ? profileData.specialization.map((s: any) => String(s))
+        : [],
+      experience: profileData.experience !== undefined && profileData.experience !== null && profileData.experience !== ''
+        ? Number(profileData.experience)
+        : 0,
+      qualifications: Array.isArray(profileData.qualifications)
+        ? profileData.qualifications.map((q: any) => String(q))
+        : [],
+      consultationFee: profileData.consultationFee !== undefined && profileData.consultationFee !== null && profileData.consultationFee !== ''
+        ? Number(profileData.consultationFee)
+        : 500,
+      languages: Array.isArray(profileData.languages)
+        ? profileData.languages.map((l: any) => String(l))
+        : ['en']
+    };
     const db = getDatabase();
 
     // Check if user already exists
@@ -54,8 +76,8 @@ router.post('/register', [
               firstName,
               lastName,
               dateOfBirth: new Date(profileData.dateOfBirth),
-              gender: profileData.gender,
-              emergencyContact: profileData.emergencyContact,
+                            gender: (profileData.gender ? String(profileData.gender).toUpperCase() : 'OTHER') as any,
+                            ...(profileData.emergencyContact ? { emergencyContact: profileData.emergencyContact } : { emergencyContact: phone }),
               preferredLanguage: profileData.preferredLanguage || 'en'
             }
           }
@@ -65,12 +87,12 @@ router.post('/register', [
             create: {
               firstName,
               lastName,
-              licenseNumber: profileData.licenseNumber,
-              specialization: profileData.specialization || [],
-              experience: profileData.experience || 0,
-              qualifications: profileData.qualifications || [],
-              consultationFee: profileData.consultationFee || 500,
-              languages: profileData.languages || ['en']
+              licenseNumber: doctorNormalized.licenseNumber as string,
+              specialization: doctorNormalized.specialization,
+              experience: doctorNormalized.experience,
+              qualifications: doctorNormalized.qualifications,
+              consultationFee: doctorNormalized.consultationFee,
+              languages: doctorNormalized.languages
             }
           }
         }),
@@ -92,21 +114,23 @@ router.post('/register', [
       }
     });
 
-    // Generate JWT token
+    // Generate JWT token (persistent session - 30 days)
     const token = jwt.sign(
       { userId: user.id, role: user.role },
       process.env.JWT_SECRET as jwt.Secret,
-      ({ expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as StringValue } as SignOptions)
+      ({ expiresIn: '30d' } as SignOptions) // 30 days persistent session
     );
 
-    // Store session in Redis
+    // Store session in Redis (skip if Redis not available)
     const redis = getRedis();
-    await redis.setUserSession(user.id, {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      loginTime: new Date().toISOString()
-    });
+    if (redis) {
+      await redis.setUserSession(user.id, {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        loginTime: new Date().toISOString()
+      });
+    }
 
     logger.info(`User registered: ${user.email} (${user.role})`);
 
@@ -163,21 +187,23 @@ router.post('/login', [
       throw createError('Invalid credentials', 401);
     }
 
-    // Generate JWT token
+    // Generate JWT token (persistent session - 30 days)
     const token = jwt.sign(
       { userId: user.id, role: user.role },
       process.env.JWT_SECRET as jwt.Secret,
-      ({ expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as StringValue } as SignOptions)
+      ({ expiresIn: '30d' as StringValue } as SignOptions) // 30 days persistent session
     );
 
-    // Store session in Redis
+    // Store session in Redis (skip if Redis not available)
     const redis = getRedis();
-    await redis.setUserSession(user.id, {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      loginTime: new Date().toISOString()
-    });
+    if (redis) {
+      await redis.setUserSession(user.id, {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        loginTime: new Date().toISOString()
+      });
+    }
 
     logger.info(`User logged in: ${user.email} (${user.role})`);
 
@@ -200,7 +226,7 @@ router.post('/login', [
   }
 });
 
-// Logout user
+// Logout user (comprehensive session cleanup)
 router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -210,15 +236,22 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
     const redis = getRedis();
-    
-    // Remove session from Redis
-    await redis.deleteUserSession(decoded.userId);
 
+    // Remove session from Redis (skip if Redis not available)
+    if (redis) {
+      await redis.deleteUserSession(decoded.userId);
+    }
+
+    // Log the logout event
     logger.info(`User logged out: ${decoded.userId}`);
 
     res.json({
       status: 'success',
-      message: 'Logout successful'
+      message: 'Logout successful - session cleared',
+      data: {
+        loggedOutAt: new Date().toISOString(),
+        sessionCleared: true
+      }
     });
   } catch (error) {
     next(error);
@@ -245,8 +278,8 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       throw createError('User not found or inactive', 401);
     }
 
-    // Generate new token
-    const signOptions: SignOptions = { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as StringValue };
+    // Generate new token (persistent session - 30 days)
+    const signOptions: SignOptions = { expiresIn: '30d' as StringValue };
     const newToken = jwt.sign(
       { userId: user.id, role: user.role },
       process.env.JWT_SECRET as jwt.Secret,

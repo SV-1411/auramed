@@ -43,11 +43,19 @@ export class NotificationService {
   }
 
   private setupTwilioClient() {
-    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-      this.twilioClient = twilio(
-        process.env.TWILIO_ACCOUNT_SID,
-        process.env.TWILIO_AUTH_TOKEN
-      );
+    try {
+      if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && 
+          process.env.TWILIO_ACCOUNT_SID.startsWith('AC')) {
+        this.twilioClient = twilio(
+          process.env.TWILIO_ACCOUNT_SID,
+          process.env.TWILIO_AUTH_TOKEN
+        );
+        logger.info('Twilio client initialized successfully');
+      } else {
+        logger.warn('Twilio credentials not configured or invalid - SMS features disabled');
+      }
+    } catch (error) {
+      logger.warn('Failed to initialize Twilio client:', error);
     }
   }
 

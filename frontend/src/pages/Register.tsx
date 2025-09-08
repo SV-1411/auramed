@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { HeartIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import '../index.css';
+import CardNav from '../components/CardNav';
 
 const Register: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -92,38 +94,76 @@ const Register: React.FC = () => {
     'Pediatrics', 'Psychiatry', 'Radiology', 'Surgery'
   ];
 
+  // Public logo and nav items for CardNav
+  const logoUrl = '/assets/logo2.png';
+  const navItems = [
+    {
+      label: 'About',
+      bgColor: '#0D0716',
+      textColor: '#fff',
+      links: [
+        { label: 'Company', ariaLabel: 'About Company', href: '/about' },
+        { label: 'Careers', ariaLabel: 'Careers', href: '/about#careers' }
+      ]
+    },
+    {
+      label: 'Explore',
+      bgColor: '#170D27',
+      textColor: '#fff',
+      links: [
+        { label: 'Home', ariaLabel: 'Home', href: '/' },
+        { label: 'Features', ariaLabel: 'Features', href: '/#features' }
+      ]
+    },
+    {
+      label: 'Contact',
+      bgColor: '#271E37',
+      textColor: '#fff',
+      links: [
+        { label: 'Email', ariaLabel: 'Email us', href: 'mailto:contact@auramed.example' },
+        { label: 'LinkedIn', ariaLabel: 'LinkedIn', href: 'https://www.linkedin.com/' }
+      ]
+    }
+  ];
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="flex justify-center">
-            <HeartIcon className="h-12 w-12 text-blue-600" />
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Join AuraMed
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Create your account to access AI-powered healthcare
-          </p>
-        </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+    <div className="min-h-screen bg-gray-50">
+      {/* Top navigation only */}
+      <section className="relative auramed-overlay overflow-hidden">
+        <CardNav
+          logo={logoUrl}
+          logoAlt="AuraMed Logo"
+          items={navItems}
+          baseColor="#ffffff"
+          menuColor="#000000"
+          buttonBgColor="#111111"
+          buttonTextColor="#ffffff"
+          ease="power3.out"
+        />
+        {/* Reserved space for CardNav height */}
+        <div className="h-20 sm:h-24" />
+      </section>
+
+      {/* Form card */}
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-14 flex items-start justify-center">
+        <div className="max-w-3xl w-full">
+          <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
+            <div className="text-center mb-4">
+              <h1 className="text-2xl font-extrabold text-gray-900">Join AuraMed</h1>
+              <p className="text-sm text-gray-600">Create your account to access AI-powered healthcare</p>
+            </div>
+
+            <form className="form" onSubmit={handleSubmit}>
           {/* Role Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              I am a
-            </label>
-            <div className="grid grid-cols-3 gap-2">
+          <div className="form-group">
+            <label className="form-label">I am a</label>
+            <div className="role-selector">
               {(['patient', 'doctor', 'admin'] as const).map((role) => (
                 <button
                   key={role}
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, role }))}
-                  className={`px-3 py-2 text-sm font-medium rounded-md border ${
-                    formData.role === role
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                  }`}
+                  className={`role-button ${formData.role === role ? 'active' : ''}`}
                 >
                   {role.charAt(0).toUpperCase() + role.slice(1)}
                 </button>
@@ -132,9 +172,9 @@ const Register: React.FC = () => {
           </div>
 
           {/* Basic Information */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="firstName" className="form-label">
                 First Name *
               </label>
               <input
@@ -144,11 +184,12 @@ const Register: React.FC = () => {
                 required
                 value={formData.firstName}
                 onChange={handleInputChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="form-input"
+                placeholder="Enter your first name"
               />
             </div>
-            <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+            <div className="form-group">
+              <label htmlFor="lastName" className="form-label">
                 Last Name *
               </label>
               <input
@@ -158,13 +199,14 @@ const Register: React.FC = () => {
                 required
                 value={formData.lastName}
                 onChange={handleInputChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="form-input"
+                placeholder="Enter your last name"
               />
             </div>
           </div>
 
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+          <div className="form-group">
+            <label htmlFor="email" className="form-label">
               Email Address *
             </label>
             <input
@@ -174,12 +216,13 @@ const Register: React.FC = () => {
               required
               value={formData.email}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="form-input"
+              placeholder="Enter your email address"
             />
           </div>
 
-          <div>
-            <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+          <div className="form-group">
+            <label htmlFor="phoneNumber" className="form-label">
               Phone Number
             </label>
             <input
@@ -188,16 +231,17 @@ const Register: React.FC = () => {
               type="tel"
               value={formData.phoneNumber}
               onChange={handleInputChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="form-input"
+              placeholder="Enter your phone number"
             />
           </div>
 
           {/* Patient/Doctor specific fields */}
           {(formData.role === 'patient' || formData.role === 'doctor') && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="dateOfBirth" className="form-label">
                     Date of Birth
                   </label>
                   <input
@@ -206,11 +250,11 @@ const Register: React.FC = () => {
                     type="date"
                     value={formData.dateOfBirth}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="form-input"
                   />
                 </div>
-                <div>
-                  <label htmlFor="gender" className="block text-sm font-medium text-gray-700">
+                <div className="form-group">
+                  <label htmlFor="gender" className="form-label">
                     Gender
                   </label>
                   <select
@@ -218,7 +262,7 @@ const Register: React.FC = () => {
                     name="gender"
                     value={formData.gender}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="form-select"
                   >
                     <option value="">Select Gender</option>
                     <option value="male">Male</option>
@@ -234,8 +278,8 @@ const Register: React.FC = () => {
           {/* Doctor specific fields */}
           {formData.role === 'doctor' && (
             <>
-              <div>
-                <label htmlFor="licenseNumber" className="block text-sm font-medium text-gray-700">
+              <div className="form-group">
+                <label htmlFor="licenseNumber" className="form-label">
                   Medical License Number *
                 </label>
                 <input
@@ -245,18 +289,19 @@ const Register: React.FC = () => {
                   required
                   value={formData.licenseNumber}
                   onChange={handleInputChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="form-input"
+                  placeholder="Enter your medical license number"
                 />
               </div>
 
-              <div>
-                <label htmlFor="specialization" className="block text-sm font-medium text-gray-700">
+              <div className="form-group">
+                <label htmlFor="specialization" className="form-label">
                   Specialization *
                 </label>
                 <select
                   id="specialization"
                   onChange={handleSpecializationChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="form-select"
                 >
                   <option value="">Add Specialization</option>
                   {specializationOptions.map(spec => (
@@ -264,17 +309,14 @@ const Register: React.FC = () => {
                   ))}
                 </select>
                 {formData.specialization.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="specialization-tags">
                     {formData.specialization.map(spec => (
-                      <span
-                        key={spec}
-                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                      >
+                      <span key={spec} className="specialization-tag">
                         {spec}
                         <button
                           type="button"
                           onClick={() => removeSpecialization(spec)}
-                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          className="remove-tag"
                         >
                           ×
                         </button>
@@ -284,8 +326,8 @@ const Register: React.FC = () => {
                 )}
               </div>
 
-              <div>
-                <label htmlFor="experience" className="block text-sm font-medium text-gray-700">
+              <div className="form-group">
+                <label htmlFor="experience" className="form-label">
                   Years of Experience
                 </label>
                 <input
@@ -295,18 +337,19 @@ const Register: React.FC = () => {
                   min="0"
                   value={formData.experience}
                   onChange={handleInputChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="form-input"
+                  placeholder="Enter years of experience"
                 />
               </div>
             </>
           )}
 
           {/* Password fields */}
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+          <div className="form-group">
+            <label htmlFor="password" className="form-label">
               Password *
             </label>
-            <div className="mt-1 relative">
+            <div className="password-container">
               <input
                 id="password"
                 name="password"
@@ -314,27 +357,28 @@ const Register: React.FC = () => {
                 required
                 value={formData.password}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="form-input"
+                placeholder="Enter your password"
               />
               <button
                 type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                className="password-toggle"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? (
-                  <EyeSlashIcon className="h-5 w-5 text-gray-400" />
+                  <EyeSlashIcon className="password-icon" />
                 ) : (
-                  <EyeIcon className="h-5 w-5 text-gray-400" />
+                  <EyeIcon className="password-icon" />
                 )}
               </button>
             </div>
           </div>
 
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+          <div className="form-group">
+            <label htmlFor="confirmPassword" className="form-label">
               Confirm Password *
             </label>
-            <div className="mt-1 relative">
+            <div className="password-container">
               <input
                 id="confirmPassword"
                 name="confirmPassword"
@@ -342,48 +386,48 @@ const Register: React.FC = () => {
                 required
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="form-input"
+                placeholder="Confirm your password"
               />
               <button
                 type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                className="password-toggle"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               >
                 {showConfirmPassword ? (
-                  <EyeSlashIcon className="h-5 w-5 text-gray-400" />
+                  <EyeSlashIcon className="password-icon" />
                 ) : (
-                  <EyeIcon className="h-5 w-5 text-gray-400" />
+                  <EyeIcon className="password-icon" />
                 )}
               </button>
             </div>
           </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Creating account...
-                </div>
-              ) : (
-                'Create Account'
-              )}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="submit-button"
+          >
+            {loading ? (
+              <>
+                <div className="loading-spinner"></div>
+                Creating account...
+              </>
+            ) : (
+              'Create Account'
+            )}
+          </button>
 
-          <div className="text-center">
-            <span className="text-sm text-gray-600">
+            </form>
+
+            <div className="form-footer">
               Already have an account?{' '}
-              <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+              <Link to="/login" className="form-link">
                 Sign in
               </Link>
-            </span>
+            </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

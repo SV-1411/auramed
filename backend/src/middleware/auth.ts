@@ -27,12 +27,13 @@ export const authenticateToken = async (
     // Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
     
-    // Check if session exists in Redis
+    // Check if session exists in Redis (skip if Redis not available)
     const redis = getRedis();
-    const session = await redis.getUserSession(decoded.userId);
-    
-    if (!session) {
-      throw createError('Session expired', 401);
+    if (redis) {
+      const session = await redis.getUserSession(decoded.userId);
+      if (!session) {
+        throw createError('Session expired', 401);
+      }
     }
 
     // Attach user info to request

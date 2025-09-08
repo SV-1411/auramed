@@ -1,0 +1,7 @@
+{
+  "symptoms": ["fever", "cough"],
+  "patient_age": 40,
+  "patient_gender": "male",
+  "medical_history": ["hypertension"],
+  "current_medications": ["ibuprofen"]
+}

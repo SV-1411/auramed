@@ -1,12 +1,13 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider, AuthContext, useAuth } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
-// AuthContext imported above; also use useAuth for safer consumption
 
 // Pages
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import PatientDashboard from './pages/PatientDashboard';
@@ -16,23 +17,75 @@ import AIChat from './pages/AIChat';
 import Appointments from './pages/Appointments';
 import VideoConsultation from './pages/VideoConsultation';
 import Profile from './pages/Profile';
+import FamilyProfile from './pages/FamilyProfile';
+import MultilingualSupport from './pages/MultilingualSupport';
+import PredictiveHealthInsights from './pages/PredictiveHealthInsights';
+import About from './pages/About';
 
 // Components
 import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
 import LoadingSpinner from './components/LoadingSpinner';
+import AuraMedLoader from './components/AuraMedLoader';
 
 function App() {
   return (
-    <AuthProvider>
-      <SocketProvider>
-        <Router>
-          <div className="min-h-screen bg-gray-50">
-            <Navbar />
-            <main className="container mx-auto px-4 py-8">
+    <ThemeProvider>
+      <AuthProvider>
+        <AppWithAuth />
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}
+
+function AppWithAuth() {
+  const { user, token } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const location = useLocation();
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const publicPaths = new Set(['/', '/login', '/register', '/about']);
+  const hideChrome = publicPaths.has(location.pathname);
+
+  // Show a brief branded loader during route transitions
+  useEffect(() => {
+    setRouteLoading(true);
+    // Allow the next page to render; hide shortly after to cover fetch/layout
+    const t = setTimeout(() => setRouteLoading(false), 800);
+    return () => clearTimeout(t);
+  }, [location.pathname]);
+ 
+  // Initial splash before the first paint of Landing (or any route)
+  useEffect(() => {
+    const t = setTimeout(() => setInitialLoading(false), 3000);
+    return () => clearTimeout(t);
+  }, []);
+  
+  return (
+    <SocketProvider user={user} token={token}>
+          <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:bg-gradient-to-br dark:from-slate-900 dark:via-blue-900 dark:to-teal-900 transition-all duration-300">
+            <AuraMedLoader active={initialLoading || routeLoading} />
+            {!hideChrome && (
+              <Navbar
+                isSidebarOpen={!!user && isSidebarOpen}
+                onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+              />
+            )}
+
+            {/* Sidebar (only when authenticated) */}
+            {user && !hideChrome && (
+              <Sidebar isOpen={isSidebarOpen} />
+            )}
+
+            <main
+              className={`transition-all duration-300 ${user && !hideChrome ? (isSidebarOpen ? 'ml-64' : 'ml-16') : ''}`}
+            >
               <Routes>
                 {/* Public Routes */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
+                <Route path="/" element={<Landing />} />
+                <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+                <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
+                <Route path="/about" element={<About />} />
                 
                 {/* Protected Routes */}
                 <Route path="/dashboard" element={
@@ -65,11 +118,38 @@ function App() {
                   </ProtectedRoute>
                 } />
                 
-                {/* Default redirect */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/family" element={
+                  <ProtectedRoute>
+                    <FamilyProfile />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/multilingual" element={
+                  <ProtectedRoute>
+                    <MultilingualSupport />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/predictive-insights" element={
+                  <ProtectedRoute>
+                    <PredictiveHealthInsights />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/video-consultation" element={
+                  <ProtectedRoute>
+                    <VideoConsultation />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/video/:roomId" element={
+                  <ProtectedRoute>
+                    <VideoConsultation />
+                  </ProtectedRoute>
+                } />
               </Routes>
             </main>
-            
+
             {/* Global Toast Notifications */}
             <Toaster
               position="top-right"
@@ -96,10 +176,8 @@ function App() {
               }}
             />
           </div>
-        </Router>
       </SocketProvider>
-    </AuthProvider>
-  );
+    );
 }
 
 // Dashboard Router Component

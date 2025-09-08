@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="160" height="32" viewBox="0 0 160 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="160" height="32" rx="6" fill="#0F172A"/>
+  <g font-family="Inter, Arial, sans-serif" font-weight="800" font-size="16">
+    <text x="12" y="21" fill="#60A5FA" letter-spacing="0.2em">AURA</text>
+    <text x="68" y="21" fill="#A78BFA" letter-spacing="0.2em">MED</text>
+  </g>
+</svg>

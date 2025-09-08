@@ -2,6 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import path from 'path';
+
+// Load environment variables from the repository root .env
+// Works from both ts-node (src) and compiled (dist) by resolving relative to current dir
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import rateLimit from 'express-rate-limit';
@@ -23,6 +28,7 @@ import videoRoutes from './routes/video';
 import familyRoutes from './routes/family';
 import healthInsightsRoutes from './routes/health-insights';
 import translationRoutes from './routes/translation';
+import { router as predictiveInsightsRoutes } from './routes/predictive-insights';
 
 // AI Agents
 import { PatientAIAgent } from './agents/PatientAIAgent';
@@ -30,7 +36,7 @@ import { DoctorAIAgent } from './agents/DoctorAIAgent';
 import { AdminAIAgent } from './agents/AdminAIAgent';
 import { AgentOrchestrator } from './agents/AgentOrchestrator';
 
-dotenv.config();
+// dotenv already configured above
 
 const app = express();
 const server = createServer(app);
@@ -49,6 +55,9 @@ const limiter = rateLimit({
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
   message: 'Too many requests from this IP, please try again later.'
 });
+
+// Trust proxy for rate limiting
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet());
@@ -75,9 +84,10 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/ai-agents', aiAgentRoutes);
 app.use('/api/video', videoRoutes);
-app.use('/api/family', familyRoutes);
+app.use('/api/family-members', familyRoutes); // Fix: Change to match frontend expectations
 app.use('/api/health-insights', healthInsightsRoutes);
 app.use('/api/translation', translationRoutes);
+app.use('/api/predictive-insights', predictiveInsightsRoutes);
 
 // Error handling
 app.use(errorHandler);
@@ -87,59 +97,86 @@ let agentOrchestrator: AgentOrchestrator;
 
 async function initializeAIAgents() {
   try {
+    logger.info('Creating AI agent instances...');
     const patientAgent = new PatientAIAgent();
     const doctorAgent = new DoctorAIAgent();
     const adminAgent = new AdminAIAgent();
-    
+
+    logger.info('Creating agent orchestrator...');
     agentOrchestrator = new AgentOrchestrator(patientAgent, doctorAgent, adminAgent, io);
+
+    logger.info('Initializing agent orchestrator...');
     await agentOrchestrator.initialize();
-    
+
     logger.info('AI Agents initialized successfully');
   } catch (error) {
     logger.error('Failed to initialize AI Agents:', error);
+    logger.error('AI Agent error details:', {
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+      name: (error as Error).name
+    });
+    // Don't let AI agent failures crash the server - continue without AI agents
   }
 }
 
 // Socket.IO for real-time communication
 io.on('connection', (socket) => {
   logger.info(`Client connected: ${socket.id}`);
-  
+
   socket.on('join-room', (roomId: string) => {
     socket.join(roomId);
     logger.info(`Client ${socket.id} joined room ${roomId}`);
   });
-  
+
   socket.on('ai-message', async (data) => {
     if (agentOrchestrator) {
       await agentOrchestrator.handleMessage(socket, data);
     }
   });
-  
+
   socket.on('disconnect', () => {
     logger.info(`Client disconnected: ${socket.id}`);
   });
 });
 
+// WebSocket endpoint for frontend compatibility
+app.get('/ws', (req, res) => {
+  res.status(200).json({ message: 'WebSocket endpoint available', status: 'connected' });
+});
+
 // Start server
 async function startServer() {
   try {
+    logger.info('Starting AuraMed Backend Server...');
+
     // Initialize database
+    logger.info('Initializing database...');
     await initializeDatabase();
     logger.info('Database connected successfully');
-    
+
     // Initialize Redis
+    logger.info('Initializing Redis...');
     await connectRedis();
     logger.info('Redis connected successfully');
-    
+
     // Initialize AI Agents
+    logger.info('Initializing AI Agents...');
     await initializeAIAgents();
-    
+
+    logger.info('Starting server on port ' + PORT);
     server.listen(PORT, () => {
       logger.info(`AuraMed Backend Server running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV}`);
+      logger.info('Server started successfully - listening for connections...');
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
+    logger.error('Error details:', {
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+      name: (error as Error).name
+    });
     process.exit(1);
   }
 }

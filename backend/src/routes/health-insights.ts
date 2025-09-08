@@ -5,6 +5,24 @@ import { logger } from '../utils/logger';
 
 const router = express.Router();
 
+// Get health insights for current authenticated user
+router.get('/', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { limit = 5 } = req.query;
+
+    const insights = await healthInsightsService.generateHealthInsights(userId!);
+
+    res.json({
+      success: true,
+      data: { insights: insights.slice(0, parseInt(limit as string)) }
+    });
+  } catch (error) {
+    logger.error('Failed to get health insights:', error);
+    res.status(500).json({ error: 'Failed to get health insights' });
+  }
+});
+
 // Get health insights for a patient
 router.get('/:patientId', authenticateToken, async (req: Request, res: Response) => {
   try {

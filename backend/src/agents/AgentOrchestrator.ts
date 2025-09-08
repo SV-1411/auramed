@@ -36,20 +36,43 @@ export class AgentOrchestrator {
     this.doctorAgent = doctorAgent;
     this.adminAgent = adminAgent;
     this.io = io;
-    this.redis = new RedisService();
+
+    // Only create RedisService if Redis is available
+    const redisUrl = process.env.REDIS_URL;
+    const redisDisabled = process.env.DISABLE_REDIS === 'true';
+
+    if (redisUrl && !redisDisabled && redisUrl.startsWith('redis://')) {
+      try {
+        this.redis = new RedisService();
+        logger.info('Redis service created for agent orchestrator');
+      } catch (error) {
+        logger.warn('Failed to create Redis service:', (error as Error).message);
+        this.redis = null as any;
+      }
+    } else {
+      logger.info('Redis disabled - agent orchestrator will run without Redis');
+      this.redis = null as any;
+    }
   }
 
   async initialize(): Promise<void> {
     try {
+      logger.info('Setting up inter-agent communication channels...');
       // Set up inter-agent communication channels
       await this.setupAgentCommunication();
-      
+
+      logger.info('Starting background monitoring tasks...');
       // Start background monitoring tasks
       this.startBackgroundTasks();
-      
+
       logger.info('Agent Orchestrator initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize Agent Orchestrator:', error);
+      logger.error('Agent Orchestrator error details:', {
+        message: (error as Error).message,
+        stack: (error as Error).stack,
+        name: (error as Error).name
+      });
       throw error;
     }
   }
@@ -68,8 +91,13 @@ export class AgentOrchestrator {
         isProcessed: false
       };
 
-      // Store message in Redis for processing queue
-      await this.redis.addToProcessingQueue(message);
+      // Store message in Redis for processing queue (skip if Redis not available)
+      try {
+        await this.redis.addToProcessingQueue(message);
+      } catch (error) {
+        logger.warn('Failed to store message in Redis queue:', (error as Error).message);
+        // Continue without Redis queue
+      }
 
       // Route message to appropriate agent
       const response = await this.routeMessage(message);
@@ -195,8 +223,13 @@ export class AgentOrchestrator {
     // Broadcast to all connected admin users
     this.io.to('admin-room').emit('system-alert', alertMessage);
     
-    // Store in Redis for persistence
-    await this.redis.storeSystemAlert(alertMessage);
+    // Store in Redis for persistence (skip if Redis not available)
+    try {
+      await this.redis.storeSystemAlert(alertMessage);
+    } catch (error) {
+      logger.warn('Failed to store system alert in Redis:', (error as Error).message);
+      // Continue without Redis persistence
+    }
   }
 
   private async handleEmergencyEscalation(
@@ -235,17 +268,22 @@ export class AgentOrchestrator {
   }
 
   private async setupAgentCommunication(): Promise<void> {
-    // Set up Redis pub/sub for agent communication
-    await this.redis.subscribe('agent-communication', (message) => {
-      this.handleAgentMessage(JSON.parse(message));
-    });
+    try {
+      // Set up Redis pub/sub for agent communication (skip if Redis not available)
+      await this.redis.subscribe('agent-communication', (message) => {
+        this.handleAgentMessage(JSON.parse(message));
+      });
+    } catch (error) {
+      logger.warn('Redis pub/sub setup failed - running without Redis:', (error as Error).message);
+      // Continue without Redis pub/sub
+    }
 
     // Set up WebSocket rooms for different user types
     this.io.on('connection', (socket) => {
       socket.on('join-agent-room', (data) => {
         const { userType, userId } = data;
         socket.join(`${userType}-${userId}`);
-        
+
         if (userType === 'admin') {
           socket.join('admin-room');
         }

@@ -8,7 +8,7 @@ import {
   MicrophoneIcon,
   StopIcon,
   ExclamationTriangleIcon,
-  HeartIcon,
+  ChatBubbleLeftRightIcon,
   UserIcon,
   ComputerDesktopIcon
 } from '@heroicons/react/24/outline';
@@ -69,6 +69,7 @@ const AIChat: React.FC = () => {
       setMessages(history);
     } catch (error) {
       console.error('Failed to load chat history:', error);
+      // Continue without history if API fails
     }
   };
 
@@ -259,7 +260,7 @@ const AIChat: React.FC = () => {
         <div className="border-b px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <HeartIcon className="h-6 w-6 text-blue-600" />
+              <ChatBubbleLeftRightIcon className="h-6 w-6 text-blue-600" />
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">AI Health Assistant</h1>
                 <p className="text-sm text-gray-500">
@@ -280,7 +281,7 @@ const AIChat: React.FC = () => {
         <div className="h-96 overflow-y-auto p-6">
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 mt-8">
-              <HeartIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <ChatBubbleLeftRightIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p className="text-lg font-medium">Welcome to AuraMed AI</p>
               <p className="text-sm">Start a conversation about your health concerns</p>
             </div>

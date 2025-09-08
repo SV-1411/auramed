@@ -3,6 +3,19 @@ import { PrismaClient, AppointmentStatus } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
 
+// Extend Request interface to include user property
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        userId: string;
+        role: string;
+      };
+    }
+  }
+}
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -195,3 +208,4 @@ router.get('/health-insights', authenticateToken, async (req: Request, res: Resp
 });
 
 export default router;
+

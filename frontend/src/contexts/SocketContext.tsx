@@ -1,7 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
+
+interface User {
+  id: string;
+  email: string;
+  phone: string;
+  role: 'PATIENT' | 'DOCTOR' | 'ADMIN';
+  profile: any;
+}
 
 interface SocketContextType {
   socket: Socket | null;
@@ -13,15 +20,21 @@ interface SocketContextType {
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
-export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface SocketProviderProps {
+  children: React.ReactNode;
+  user: User | null;
+  token: string | null;
+}
+
+export const SocketProvider: React.FC<SocketProviderProps> = ({ children, user, token }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const { user, token } = useAuth();
 
   useEffect(() => {
     if (user && token) {
       // Initialize socket connection
-      const newSocket = io(process.env.REACT_APP_API_URL || 'http://localhost:3000', {
+      const apiUrl = (import.meta as any)?.env?.VITE_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:3000';
+      const newSocket = io(apiUrl, {
         auth: {
           token,
         },
