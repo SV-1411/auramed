@@ -84,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Configure axios defaults
   useEffect(() => {
     // Set base URL for all axios requests
-    const apiUrl = (import.meta as any)?.env?.VITE_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    const apiUrl = (import.meta as any)?.env?.VITE_API_URL || 'http://localhost:3000';
     axios.defaults.baseURL = apiUrl;
     
     if (state.token) {

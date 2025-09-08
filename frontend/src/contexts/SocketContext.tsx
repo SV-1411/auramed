@@ -33,7 +33,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children, user, 
   useEffect(() => {
     if (user && token) {
       // Initialize socket connection
-      const apiUrl = (import.meta as any)?.env?.VITE_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:3000';
+      const apiUrl = (import.meta as any)?.env?.VITE_API_URL || 'http://localhost:3000';
       const newSocket = io(apiUrl, {
         auth: {
           token,
