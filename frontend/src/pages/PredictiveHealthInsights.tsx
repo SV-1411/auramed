@@ -56,8 +56,11 @@ const PredictiveHealthInsights: React.FC = () => {
         axios.get('/api/predictive-metrics')
       ]);
 
-      setInsights(insightsRes.data.data.insights || []);
-      setMetrics(metricsRes.data.data.metrics || []);
+      const insightsData = insightsRes?.data?.data?.insights;
+      const metricsData = metricsRes?.data?.data?.metrics;
+
+      setInsights(Array.isArray(insightsData) ? insightsData : []);
+      setMetrics(Array.isArray(metricsData) ? metricsData : (metricsData ? [metricsData] : []));
     } catch (error) {
       toast.error('Failed to load predictive health insights');
     } finally {
@@ -253,11 +256,11 @@ const PredictiveHealthInsights: React.FC = () => {
 
                       <p className="text-light-text-primary dark:text-dark-text-primary mb-4">{insight.description}</p>
 
-                      {insight.riskFactors.length > 0 && (
+                      {(Array.isArray(insight.riskFactors) ? insight.riskFactors : []).length > 0 && (
                         <div className="mb-4">
                           <h5 className="text-sm font-medium text-light-text-secondary dark:text-dark-text-secondary mb-2">Risk Factors:</h5>
                           <div className="flex flex-wrap gap-2">
-                            {insight.riskFactors.map((factor, idx) => (
+                            {(Array.isArray(insight.riskFactors) ? insight.riskFactors : []).map((factor, idx) => (
                               <span key={idx} className="px-2 py-1 bg-white/50 dark:bg-dark-surface/50 rounded-full text-xs">
                                 {factor}
                               </span>
@@ -266,11 +269,11 @@ const PredictiveHealthInsights: React.FC = () => {
                         </div>
                       )}
 
-                      {insight.recommendations.length > 0 && (
+                      {(Array.isArray(insight.recommendations) ? insight.recommendations : []).length > 0 && (
                         <div>
                           <h5 className="text-sm font-medium text-light-text-secondary dark:text-dark-text-secondary mb-2">Recommendations:</h5>
                           <ul className="space-y-1">
-                            {insight.recommendations.map((rec, idx) => (
+                            {(Array.isArray(insight.recommendations) ? insight.recommendations : []).map((rec, idx) => (
                               <li key={idx} className="text-sm text-light-text-primary dark:text-dark-text-primary flex items-start space-x-2">
                                 <span className="text-sapphire-600 dark:text-sapphire-400 mt-1">•</span>
                                 <span>{rec}</span>

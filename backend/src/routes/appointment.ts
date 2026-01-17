@@ -8,6 +8,208 @@ import { authenticateToken, requireRole } from '../middleware/auth';
 
 const router = express.Router();
 
+function parseTimeToMinutes(time: string): number {
+  const [hh, mm] = String(time || '').split(':').map((x) => parseInt(x, 10));
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 0;
+  return Math.max(0, Math.min(23, hh)) * 60 + Math.max(0, Math.min(59, mm));
+}
+
+function addMinutesToDate(base: Date, minutes: number) {
+  return new Date(base.getTime() + minutes * 60 * 1000);
+}
+
+function startOfDay(d: Date) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+async function cleanupExpiredHolds(db: any) {
+  const now = new Date();
+  try {
+    await (db as any).appointmentSlotHold.updateMany({
+      where: { status: 'HELD', expiresAt: { lt: now } },
+      data: { status: 'EXPIRED' }
+    });
+  } catch {
+    // ignore
+  }
+}
+
+// List available slots for a doctor (BookMyShow-style)
+router.get('/slots', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { doctorId, days = '7', slotMinutes = '30' } = req.query as any;
+    if (!doctorId) {
+      throw createError('doctorId is required', 400);
+    }
+
+    const db = getDatabase();
+    await cleanupExpiredHolds(db);
+
+    const d = await db.user.findFirst({ where: { id: String(doctorId), role: 'DOCTOR' }, include: { doctorProfile: { include: { availabilitySlots: true } } } });
+    if (!d) throw createError('Doctor not found', 404);
+
+    const daysN = Math.max(1, Math.min(14, parseInt(String(days), 10) || 7));
+    const slotM = Math.max(10, Math.min(60, parseInt(String(slotMinutes), 10) || 30));
+
+    const availabilitySlots = (d as any).doctorProfile?.availabilitySlots || [];
+    const now = new Date();
+
+    const candidates: Date[] = [];
+    for (let dayOffset = 0; dayOffset < daysN; dayOffset++) {
+      const date = startOfDay(addMinutesToDate(now, dayOffset * 24 * 60));
+      const dow = date.getDay();
+      const daySlots = availabilitySlots.filter((s: any) => s?.isAvailable && s?.dayOfWeek === dow);
+      for (const s of daySlots) {
+        const startMin = parseTimeToMinutes(s.startTime);
+        const endMin = parseTimeToMinutes(s.endTime);
+        for (let m = startMin; m + slotM <= endMin; m += slotM) {
+          const candidate = addMinutesToDate(date, m);
+          if (candidate.getTime() >= now.getTime() + 2 * 60 * 1000) candidates.push(candidate);
+        }
+      }
+    }
+
+    const endWindow = addMinutesToDate(now, daysN * 24 * 60);
+    const [existingAppointments, holds] = await Promise.all([
+      db.appointment.findMany({
+        where: { doctorId: String(doctorId), scheduledAt: { gte: now, lte: endWindow }, status: { in: ['SCHEDULED', 'IN_PROGRESS'] } },
+        select: { scheduledAt: true }
+      }),
+      (db as any).appointmentSlotHold.findMany({
+        where: { doctorId: String(doctorId), status: 'HELD', expiresAt: { gt: now } },
+        select: { scheduledAt: true, expiresAt: true, patientId: true }
+      })
+    ]);
+
+    const taken = new Set(existingAppointments.map((a: any) => new Date(a.scheduledAt).getTime()));
+    const held = new Set(holds.map((h: any) => new Date(h.scheduledAt).getTime()));
+
+    const available = candidates
+      .filter((c) => !taken.has(c.getTime()) && !held.has(c.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime())
+      .slice(0, 120);
+
+    res.json({
+      status: 'success',
+      data: {
+        slots: available.map((d) => d.toISOString()),
+        slotMinutes: slotM,
+        days: daysN
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Hold a slot for a patient (short TTL)
+router.post(
+  '/slots/hold',
+  authenticateToken,
+  requireRole(['PATIENT']),
+  [body('doctorId').isString().notEmpty(), body('scheduledAt').isISO8601(), body('ttlSeconds').optional().isInt({ min: 30, max: 600 })],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+      const patientId = (req as any).user.userId;
+      const { doctorId, scheduledAt, ttlSeconds = 180 } = req.body;
+
+      const db = getDatabase();
+      await cleanupExpiredHolds(db);
+
+      const slot = new Date(scheduledAt);
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + Math.max(30, Math.min(600, Number(ttlSeconds))) * 1000);
+
+      const existingAppointment = await db.appointment.findFirst({
+        where: { doctorId, scheduledAt: slot, status: { in: ['SCHEDULED', 'IN_PROGRESS'] } }
+      });
+      if (existingAppointment) throw createError('Slot already booked', 409);
+
+      const existingHold = await (db as any).appointmentSlotHold.findFirst({
+        where: { doctorId, scheduledAt: slot, status: 'HELD', expiresAt: { gt: now } }
+      });
+      if (existingHold) throw createError('Slot temporarily held', 409);
+
+      const hold = await (db as any).appointmentSlotHold.create({
+        data: { patientId, doctorId, scheduledAt: slot, status: 'HELD', expiresAt }
+      });
+
+      res.status(201).json({ status: 'success', data: { hold } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// Confirm a held slot -> create appointment
+router.post(
+  '/slots/confirm',
+  authenticateToken,
+  requireRole(['PATIENT']),
+  [
+    body('holdId').isString().notEmpty(),
+    body('type').isIn(['VIDEO', 'CHAT', 'EMERGENCY']),
+    body('symptoms').isArray().optional()
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+      const patientId = (req as any).user.userId;
+      const { holdId, type, symptoms = [] } = req.body;
+
+      const db = getDatabase();
+      await cleanupExpiredHolds(db);
+
+      const hold = await (db as any).appointmentSlotHold.findFirst({ where: { id: holdId, patientId, status: 'HELD' } });
+      if (!hold) throw createError('Hold not found', 404);
+      if (new Date(hold.expiresAt).getTime() <= Date.now()) {
+        await (db as any).appointmentSlotHold.update({ where: { id: holdId }, data: { status: 'EXPIRED' } });
+        throw createError('Hold expired', 409);
+      }
+
+      const doctor = await db.user.findFirst({ where: { id: hold.doctorId, role: 'DOCTOR' }, include: { doctorProfile: true } });
+      if (!doctor) throw createError('Doctor not found', 404);
+
+      const riskScore = Array.isArray(symptoms) && symptoms.length > 3 ? 75 : 25;
+      const riskLevel = riskScore > 70 ? 'HIGH' : riskScore > 40 ? 'MEDIUM' : 'LOW';
+
+      const appointment = await db.appointment.create({
+        data: {
+          patientId,
+          doctorId: hold.doctorId,
+          scheduledAt: new Date(hold.scheduledAt),
+          duration: 30,
+          type,
+          symptoms: Array.isArray(symptoms) ? symptoms.map((s: any) => String(s)) : [],
+          riskLevel,
+          riskScore,
+          paymentAmount: (doctor as any).doctorProfile?.consultationFee || 500
+        },
+        include: {
+          patient: { include: { patientProfile: true } },
+          doctor: { include: { doctorProfile: true } }
+        }
+      });
+
+      await (db as any).appointmentSlotHold.update({
+        where: { id: holdId },
+        data: { status: 'CONFIRMED', appointmentId: appointment.id }
+      });
+
+      res.status(201).json({ status: 'success', data: { appointment } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // Create appointment
 router.post('/', authenticateToken, [
   body('doctorId').isString().notEmpty(),

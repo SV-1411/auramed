@@ -11,18 +11,19 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  email     String   @unique
-  phone     String   @unique
-  password  String
-  role      UserRole
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  email           String   @unique
+  phone           String   @unique
+  password        String
+  role            UserRole
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Profile relationships
   patientProfile PatientProfile?
   doctorProfile  DoctorProfile?
+  ambulanceProfile AmbulanceProfile?
   adminProfile   AdminProfile?
 
   // Relationships
@@ -45,7 +46,148 @@ model User {
   aiMessages             AIMessage[] @relation("AIMessageUser")
   aiConversationSummary  AIConversationSummary?
 
+  sosRequestsAsPatient   SOSRequest[] @relation("SOSPatient")
+  sosRequestsAsAmbulance SOSRequest[] @relation("SOSAmbulance")
+
+  medicineOrders MedicineOrder[]
+
+  prescriptionDocuments PrescriptionDocument[]
+
+  freelanceDoctorSessions FreelanceDoctorSession[] @relation("FreelanceDoctorSessions")
+  freelanceRequestsAsPatient FreelanceRequest[] @relation("FreelanceRequestPatient")
+  freelanceRequestsAsDoctor  FreelanceRequest[] @relation("FreelanceRequestDoctor")
+
   @@map("users")
+}
+
+model FreelanceDoctorSession {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  doctorId   String   @db.ObjectId
+  isOnline   Boolean  @default(false)
+  lastLocation Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  doctor User @relation("FreelanceDoctorSessions", fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId])
+  @@map("freelance_doctor_sessions")
+}
+
+model FreelanceRequest {
+  id              String               @id @default(auto()) @map("_id") @db.ObjectId
+  patientId       String               @db.ObjectId
+  assignedDoctorId String?             @db.ObjectId
+  status          FreelanceRequestStatus @default(REQUESTED)
+  symptoms        String[]             @default([])
+  pickupLocation  Json
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  patient User @relation("FreelanceRequestPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  doctor  User? @relation("FreelanceRequestDoctor", fields: [assignedDoctorId], references: [id])
+
+  @@map("freelance_requests")
+}
+
+model PrescriptionDocument {
+  id           String                     @id @default(auto()) @map("_id") @db.ObjectId
+  patientId    String                     @db.ObjectId
+  fileUrl      String
+  mimeType     String
+  originalName String
+  status       PrescriptionExtractionStatus @default(UPLOADED)
+  extracted    Json?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  patient User @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("prescription_documents")
+}
+
+model PharmacyStore {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  isActive  Boolean  @default(true)
+  location  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inventoryItems PharmacyInventoryItem[]
+  orders         MedicineOrder[]
+
+  @@map("pharmacy_stores")
+}
+
+model MedicineProduct {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  name                 String
+  brand                String?
+  description          String?
+  category             String
+  tags                 String[] @default([])
+  requiresPrescription Boolean  @default(false)
+  price                Float
+  mrp                  Float?
+  imageUrl             String?
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  inventoryItems PharmacyInventoryItem[]
+  orderItems     MedicineOrderItem[]
+
+  @@map("medicine_products")
+}
+
+model PharmacyInventoryItem {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  pharmacyId String   @db.ObjectId
+  productId  String   @db.ObjectId
+  stock      Int      @default(0)
+  etaMinutes Int      @default(10)
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  pharmacy PharmacyStore  @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  product  MedicineProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([pharmacyId, productId])
+  @@map("pharmacy_inventory")
+}
+
+model MedicineOrder {
+  id              String             @id @default(auto()) @map("_id") @db.ObjectId
+  patientId       String             @db.ObjectId
+  pharmacyId      String             @db.ObjectId
+  status          MedicineOrderStatus @default(PENDING)
+  totalAmount     Float
+  etaMinutes      Int                @default(10)
+  deliveryAddress Json
+  deliveryLocation Json
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  patient  User          @relation(fields: [patientId], references: [id])
+  pharmacy PharmacyStore @relation(fields: [pharmacyId], references: [id])
+  items    MedicineOrderItem[]
+
+  @@map("medicine_orders")
+}
+
+model MedicineOrderItem {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId   String   @db.ObjectId
+  productId String   @db.ObjectId
+  name      String
+  quantity  Int
+  unitPrice Float
+
+  order   MedicineOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product MedicineProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("medicine_order_items")
 }
 
 model PatientProfile {
@@ -85,6 +227,25 @@ model DoctorProfile {
   location          Json? // {latitude: number, longitude: number, address: string}
   
   @@map("doctor_profiles")
+}
+
+model AmbulanceProfile {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @unique @db.ObjectId
+  firstName     String
+  lastName      String
+  organization  String?
+  vehicleNumber String?
+  driverName    String?
+  phoneAlt      String?
+  isOnDuty      Boolean  @default(true)
+  currentLocation Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ambulance_profiles")
 }
 
 model AdminProfile {
@@ -188,6 +349,22 @@ model Appointment {
   consultation      Consultation?
   
   @@map("appointments")
+}
+
+model AppointmentSlotHold {
+  id          String              @id @default(auto()) @map("_id") @db.ObjectId
+  patientId   String              @db.ObjectId
+  doctorId    String              @db.ObjectId
+  scheduledAt DateTime
+  status      AppointmentHoldStatus @default(HELD)
+  expiresAt   DateTime
+  appointmentId String?           @db.ObjectId
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([doctorId, scheduledAt])
+  @@index([patientId, createdAt])
+  @@map("appointment_slot_holds")
 }
 
 model AvailabilitySlot {
@@ -311,6 +488,22 @@ model SystemAlert {
   @@map("system_alerts")
 }
 
+model SOSRequest {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  patientId          String    @db.ObjectId
+  assignedAmbulanceId String?  @db.ObjectId
+  status             SOSStatus @default(OPEN)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  lastLocation       Json
+  notes              String?
+
+  patient   User  @relation("SOSPatient", fields: [patientId], references: [id])
+  ambulance User? @relation("SOSAmbulance", fields: [assignedAmbulanceId], references: [id])
+
+  @@map("sos_requests")
+}
+
 model AuditLog {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String?  @db.ObjectId
@@ -416,7 +609,39 @@ model DoctorReview {
 enum UserRole {
   PATIENT
   DOCTOR
+  AMBULANCE
   ADMIN
+}
+
+enum SOSStatus {
+  OPEN
+  ASSIGNED
+  RESOLVED
+  CANCELLED
+}
+
+enum FreelanceRequestStatus {
+  REQUESTED
+  OFFERED
+  ACCEPTED
+  CANCELLED
+  COMPLETED
+}
+
+enum MedicineOrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PrescriptionExtractionStatus {
+  UPLOADED
+  EXTRACTING
+  EXTRACTED
+  FAILED
 }
 
 enum Gender {
@@ -442,6 +667,13 @@ enum AppointmentStatus {
   SCHEDULED
   IN_PROGRESS
   COMPLETED
+  CANCELLED
+}
+
+enum AppointmentHoldStatus {
+  HELD
+  CONFIRMED
+  EXPIRED
   CANCELLED
 }
 

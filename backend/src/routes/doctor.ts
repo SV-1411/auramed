@@ -7,7 +7,7 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 // Get doctor profile
-router.get('/profile', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
+router.get('/profile', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
 
@@ -38,7 +38,7 @@ router.get('/profile', authenticateToken, requireRole('doctor'), async (req: Req
 });
 
 // Update doctor profile
-router.put('/profile', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
+router.put('/profile', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const { firstName, lastName, specialization, licenseNumber, experience, consultationFee } = req.body as {
@@ -92,7 +92,7 @@ router.put('/profile', authenticateToken, requireRole('doctor'), async (req: Req
 });
 
 // Get doctor appointments
-router.get('/appointments', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
+router.get('/appointments', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const { status, date, limit = 10, offset = 0 } = req.query;
@@ -146,7 +146,7 @@ router.get('/appointments', authenticateToken, requireRole('doctor'), async (req
 });
 
 // Get availability slots
-router.get('/availability', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
+router.get('/availability', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const { date } = req.query;
@@ -179,7 +179,7 @@ router.get('/availability', authenticateToken, requireRole('doctor'), async (req
 });
 
 // Create availability slot
-router.post('/availability', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
+router.post('/availability', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const { startTime, endTime, dayOfWeek, isAvailable } = req.body;
@@ -206,7 +206,7 @@ router.post('/availability', authenticateToken, requireRole('doctor'), async (re
 });
 
 // Update availability slot
-router.put('/availability/:slotId', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
+router.put('/availability/:slotId', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const { slotId } = req.params;
@@ -319,12 +319,12 @@ router.get('/patient-insights', authenticateToken, async (req: Request, res: Res
 });
 
 // Create prescription
-router.post('/prescription', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
+router.post('/prescription', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const { medicalRecordId, medications, instructions, diagnosis } = req.body;
 
-        const prescription = await prisma.prescription.create({
+    const prescription = await prisma.prescription.create({
       data: {
         medicalRecordId,
         medicationName: medications?.medicationName ?? '',
@@ -350,7 +350,7 @@ router.post('/prescription', authenticateToken, requireRole('doctor'), async (re
 });
 
 // Create medical record
-router.post('/medical-record', authenticateToken, requireRole('doctor'), async (req: Request, res: Response) => {
+router.post('/medical-record', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const { patientId, appointmentId, treatment, notes, diagnosis, symptoms, visitSummary, followUpRequired } = req.body as {

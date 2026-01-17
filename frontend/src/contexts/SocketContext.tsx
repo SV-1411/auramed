@@ -6,7 +6,7 @@ interface User {
   id: string;
   email: string;
   phone: string;
-  role: 'PATIENT' | 'DOCTOR' | 'ADMIN';
+  role: 'PATIENT' | 'DOCTOR' | 'AMBULANCE' | 'ADMIN';
   profile: any;
 }
 

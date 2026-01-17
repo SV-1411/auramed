@@ -137,7 +137,7 @@ const ConsultationChat: React.FC = () => {
   };
 
   const isMyMessage = (senderId: string) => {
-    return senderId === user?.userId;
+    return senderId === user?.id;
   };
 
   const getMessageTypeIcon = (messageType: string) => {

@@ -13,13 +13,16 @@ const Register: React.FC = () => {
     confirmPassword: '',
     firstName: '',
     lastName: '',
-    role: 'patient' as 'patient' | 'doctor' | 'admin',
+    role: 'patient' as 'patient' | 'doctor' | 'ambulance' | 'admin',
     phoneNumber: '',
     dateOfBirth: '',
     gender: '',
     specialization: [] as string[],
     licenseNumber: '',
-    experience: ''
+    experience: '',
+    organization: '',
+    vehicleNumber: '',
+    driverName: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -158,7 +161,7 @@ const Register: React.FC = () => {
           <div className="form-group">
             <label className="form-label">I am a</label>
             <div className="role-selector">
-              {(['patient', 'doctor', 'admin'] as const).map((role) => (
+              {(['patient', 'doctor', 'ambulance', 'admin'] as const).map((role) => (
                 <button
                   key={role}
                   type="button"
@@ -270,6 +273,57 @@ const Register: React.FC = () => {
                     <option value="other">Other</option>
                     <option value="prefer_not_to_say">Prefer not to say</option>
                   </select>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Ambulance specific fields */}
+          {formData.role === 'ambulance' && (
+            <>
+              <div className="form-group">
+                <label htmlFor="organization" className="form-label">
+                  Organization
+                </label>
+                <input
+                  id="organization"
+                  name="organization"
+                  type="text"
+                  value={formData.organization}
+                  onChange={handleInputChange}
+                  className="form-input"
+                  placeholder="Hospital / Provider / Self"
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="vehicleNumber" className="form-label">
+                    Vehicle Number
+                  </label>
+                  <input
+                    id="vehicleNumber"
+                    name="vehicleNumber"
+                    type="text"
+                    value={formData.vehicleNumber}
+                    onChange={handleInputChange}
+                    className="form-input"
+                    placeholder="e.g., MH12AB1234"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="driverName" className="form-label">
+                    Driver Name
+                  </label>
+                  <input
+                    id="driverName"
+                    name="driverName"
+                    type="text"
+                    value={formData.driverName}
+                    onChange={handleInputChange}
+                    className="form-input"
+                    placeholder="Driver / Crew lead"
+                  />
                 </div>
               </div>
             </>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+import { useI18n } from '../contexts/I18nContext';
 import {
   CalendarDaysIcon,
   UserGroupIcon,
@@ -51,6 +52,7 @@ interface PatientInsights {
 
 const DoctorDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [qualityMetrics, setQualityMetrics] = useState<QualityMetrics | null>(null);
   const [patientInsights, setPatientInsights] = useState<PatientInsights | null>(null);
@@ -111,7 +113,7 @@ const DoctorDashboard: React.FC = () => {
   };
 
   if (loading) {
-    return <LoadingSpinner text="Loading your dashboard..." />;
+    return <LoadingSpinner text={t('loading.doctor_dashboard')} />;
   }
 
   const todayAppointments = appointments.filter(apt => 
@@ -128,10 +130,10 @@ const DoctorDashboard: React.FC = () => {
       {/* Welcome Header */}
       <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-6 text-white">
         <h1 className="text-3xl font-bold mb-2">
-          Good morning, Dr. {user?.profile.firstName}!
+          {t('doctor.greeting', { name: user?.profile.firstName || '' })}
         </h1>
         <p className="text-blue-100">
-          You have {todayAppointments.length} appointments today. Your AI assistant is ready to help.
+          {t('doctor.subtitle', { count: todayAppointments.length })}
         </p>
       </div>
 
@@ -141,7 +143,7 @@ const DoctorDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-3xl font-bold text-blue-700 dark:text-blue-400">{todayAppointments.length}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Today's Appointments</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('doctor.todays_appointments')}</p>
             </div>
             <CalendarDaysIcon className="h-12 w-12 text-blue-500 opacity-20" />
           </div>
@@ -151,7 +153,7 @@ const DoctorDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-3xl font-bold text-green-700 dark:text-green-400">{patientInsights?.totalPatients || 0}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Total Patients</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('doctor.total_patients')}</p>
             </div>
             <UserGroupIcon className="h-12 w-12 text-green-500 opacity-20" />
           </div>
@@ -163,7 +165,7 @@ const DoctorDashboard: React.FC = () => {
               <p className="text-3xl font-bold text-yellow-700 dark:text-yellow-400">
                 {qualityMetrics?.patientSatisfactionScore?.toFixed(1) || '0.0'}
               </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Satisfaction Score</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('doctor.satisfaction_score')}</p>
             </div>
             <StarIcon className="h-12 w-12 text-yellow-500 opacity-20" />
           </div>
@@ -175,7 +177,7 @@ const DoctorDashboard: React.FC = () => {
               <p className="text-3xl font-bold text-purple-700 dark:text-purple-400">
                 {qualityMetrics?.treatmentSuccessRate?.toFixed(0) || '0'}%
               </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Success Rate</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('doctor.success_rate')}</p>
             </div>
             <ArrowTrendingUpIcon className="h-12 w-12 text-purple-500 opacity-20" />
           </div>
@@ -187,7 +189,7 @@ const DoctorDashboard: React.FC = () => {
         {/* Patient Demographics */}
         <div className="group bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">Patient Demographics</h3>
+            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">{t('doctor.patient_demographics')}</h3>
             <UserIcon className="h-6 w-6 text-blue-500" />
           </div>
           <div className="space-y-4">
@@ -211,7 +213,7 @@ const DoctorDashboard: React.FC = () => {
         {/* Common Conditions */}
         <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">Common Conditions</h3>
+            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">{t('doctor.common_conditions')}</h3>
             <HeartIcon className="h-6 w-6 text-red-500" />
           </div>
           <div className="space-y-4">
@@ -220,7 +222,7 @@ const DoctorDashboard: React.FC = () => {
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{condition.condition}</span>
                 <div className="flex items-center space-x-2">
                   <span className="text-sm font-bold text-red-700 dark:text-red-400">{condition.count}</span>
-                  <span className="text-xs text-gray-500">patients</span>
+                  <span className="text-xs text-gray-500">{t('doctor.patients')}</span>
                 </div>
               </div>
             ))}
@@ -232,33 +234,33 @@ const DoctorDashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">Attention Required</h3>
+            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">{t('doctor.attention_required')}</h3>
             <ExclamationTriangleIcon className="h-6 w-6 text-orange-500" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center p-4 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
               <div className="text-3xl font-bold text-red-700 dark:text-red-300">{patientInsights?.criticalCases || 0}</div>
-              <div className="text-sm text-red-600 dark:text-red-400">Critical Cases</div>
+              <div className="text-sm text-red-600 dark:text-red-400">{t('doctor.critical_cases')}</div>
             </div>
             <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
               <div className="text-3xl font-bold text-orange-700 dark:text-orange-300">{patientInsights?.followUpRequired || 0}</div>
-              <div className="text-sm text-orange-600 dark:text-orange-400">Follow-ups</div>
+              <div className="text-sm text-orange-600 dark:text-orange-400">{t('doctor.followups_required')}</div>
             </div>
           </div>
         </div>
 
         <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">Monthly Growth</h3>
+            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">{t('doctor.monthly_growth')}</h3>
             <ArrowTrendingUpIcon className="h-6 w-6 text-green-500" />
           </div>
           <div className="text-center">
             <div className="text-4xl font-bold text-green-700 dark:text-green-300 mb-2">
               +{patientInsights?.newPatientsThisMonth || 0}
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">New patients this month</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{t('doctor.new_patients_this_month')}</p>
             <div className="mt-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg">
-              <p className="text-xs text-green-700 dark:text-green-400">📈 Growing patient base indicates excellent care quality</p>
+              <p className="text-xs text-green-700 dark:text-green-400">📈 {t('doctor.growth_caption')}</p>
             </div>
           </div>
         </div>
@@ -269,12 +271,12 @@ const DoctorDashboard: React.FC = () => {
         <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl">
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Today's Schedule</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{t('doctor.todays_schedule')}</h2>
               <Link
                 to="/appointments"
                 className="text-sm text-blue-700 hover:text-blue-800 font-medium"
               >
-                View all
+                {t('doctor.view_all')}
               </Link>
             </div>
           </div>
@@ -283,8 +285,8 @@ const DoctorDashboard: React.FC = () => {
             {todayAppointments.length === 0 ? (
               <div className="text-center py-8">
                 <CalendarDaysIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No appointments today</p>
-                <p className="text-sm text-gray-400">Enjoy your day off!</p>
+                <p className="text-gray-500">{t('doctor.no_appointments_today')}</p>
+                <p className="text-sm text-gray-400">{t('doctor.enjoy_day_off')}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -305,12 +307,12 @@ const DoctorDashboard: React.FC = () => {
                           {appointment.patient.patientProfile.firstName} {appointment.patient.patientProfile.lastName}
                         </p>
                         <p className="text-sm text-gray-600">
-                          Age {getPatientAge(appointment.patient.patientProfile.dateOfBirth)} • {' '}
+                          {t('doctor.age')} {getPatientAge(appointment.patient.patientProfile.dateOfBirth)} • {' '}
                           {new Date(appointment.scheduledAt).toLocaleTimeString()}
                         </p>
                         {appointment.symptoms && appointment.symptoms.length > 0 && (
                           <p className="text-xs text-gray-500 mt-1">
-                            Symptoms: {appointment.symptoms.slice(0, 2).join(', ')}
+                            {t('doctor.symptoms')}: {appointment.symptoms.slice(0, 2).join(', ')}
                             {appointment.symptoms.length > 2 && '...'}
                           </p>
                         )}
@@ -336,7 +338,7 @@ const DoctorDashboard: React.FC = () => {
         {/* Performance Metrics */}
         <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Performance Metrics</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('doctor.performance_metrics')}</h2>
           </div>
           
           <div className="p-6">
@@ -344,7 +346,7 @@ const DoctorDashboard: React.FC = () => {
               <div className="space-y-6">
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">Patient Satisfaction</span>
+                    <span className="text-sm font-medium text-gray-700">{t('doctor.patient_satisfaction')}</span>
                     <span className="text-sm text-gray-900">{qualityMetrics.patientSatisfactionScore.toFixed(1)}/5.0</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -357,7 +359,7 @@ const DoctorDashboard: React.FC = () => {
 
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">Response Time Score</span>
+                    <span className="text-sm font-medium text-gray-700">{t('doctor.response_time_score')}</span>
                     <span className="text-sm text-gray-900">{qualityMetrics.responseTimeScore.toFixed(1)}/5.0</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -370,7 +372,7 @@ const DoctorDashboard: React.FC = () => {
 
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">Treatment Success Rate</span>
+                    <span className="text-sm font-medium text-gray-700">{t('doctor.treatment_success_rate')}</span>
                     <span className="text-sm text-gray-900">{qualityMetrics.treatmentSuccessRate.toFixed(0)}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -383,7 +385,7 @@ const DoctorDashboard: React.FC = () => {
 
                 <div className="pt-4 border-t">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700">Avg. Consultation Time</span>
+                    <span className="text-sm font-medium text-gray-700">{t('doctor.avg_consultation_time')}</span>
                     <span className="text-sm text-gray-900">{qualityMetrics.averageConsultationTime} min</span>
                   </div>
                 </div>
@@ -391,8 +393,8 @@ const DoctorDashboard: React.FC = () => {
             ) : (
               <div className="text-center py-8">
                 <ChartBarIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No metrics available yet</p>
-                <p className="text-sm text-gray-400">Complete consultations to see your performance</p>
+                <p className="text-gray-500">{t('doctor.no_metrics')}</p>
+                <p className="text-sm text-gray-400">{t('doctor.no_metrics_sub')}</p>
               </div>
             )}
           </div>
@@ -403,7 +405,7 @@ const DoctorDashboard: React.FC = () => {
       {upcomingAppointments.length > 0 && (
         <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('doctor.upcoming_appointments')}</h2>
           </div>
           
           <div className="p-6">
@@ -419,7 +421,7 @@ const DoctorDashboard: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">
-                    {new Date(appointment.scheduledAt).toLocaleDateString()} at{' '}
+                    {new Date(appointment.scheduledAt).toLocaleDateString()} {t('common.at')}{' '}
                     {new Date(appointment.scheduledAt).toLocaleTimeString()}
                   </p>
                   <p className="text-sm text-gray-500">
@@ -434,7 +436,7 @@ const DoctorDashboard: React.FC = () => {
 
       {/* Quick Actions */}
       <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('doctor.quick_actions')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link
             to="/ai-chat"
@@ -442,24 +444,24 @@ const DoctorDashboard: React.FC = () => {
           >
             <BellIcon className="h-8 w-8 text-blue-700 mr-3" />
             <div>
-              <h3 className="font-medium text-gray-900">AI Assistant</h3>
-              <p className="text-sm text-gray-600">Get AI-powered insights</p>
+              <h3 className="font-medium text-gray-900">{t('doctor.ai_assistant')}</h3>
+              <p className="text-sm text-gray-600">{t('doctor.ai_assistant_sub')}</p>
             </div>
           </Link>
 
           <button className="flex items-center p-4 border border-gray-200 rounded-xl hover:shadow-md hover:border-blue-200 transition-all">
             <CalendarDaysIcon className="h-8 w-8 text-blue-700 mr-3" />
             <div>
-              <h3 className="font-medium text-gray-900">Manage Schedule</h3>
-              <p className="text-sm text-gray-600">Update availability</p>
+              <h3 className="font-medium text-gray-900">{t('doctor.manage_schedule')}</h3>
+              <p className="text-sm text-gray-600">{t('doctor.manage_schedule_sub')}</p>
             </div>
           </button>
 
           <button className="flex items-center p-4 border border-gray-200 rounded-xl hover:shadow-md hover:border-blue-200 transition-all">
             <ChartBarIcon className="h-8 w-8 text-blue-700 mr-3" />
             <div>
-              <h3 className="font-medium text-gray-900">View Reports</h3>
-              <p className="text-sm text-gray-600">Performance analytics</p>
+              <h3 className="font-medium text-gray-900">{t('doctor.view_reports')}</h3>
+              <p className="text-sm text-gray-600">{t('doctor.view_reports_sub')}</p>
             </div>
           </button>
         </div>

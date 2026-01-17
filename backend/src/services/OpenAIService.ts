@@ -1,6 +1,13 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
 
+type ChatUserContent =
+  | string
+  | Array<
+      | { type: 'text'; text: string }
+      | { type: 'image_url'; image_url: { url: string } }
+    >;
+
 export class OpenAIService {
   private apiKey: string;
   private baseUrl: string;
@@ -28,9 +35,12 @@ export class OpenAIService {
 
   async generateResponse(
     systemPrompt: string, 
-    userMessage: string, 
+    userMessage: ChatUserContent,
     userId: string,
-    modelType: 'fast' | 'smart' | 'creative' = 'fast'
+    modelType: 'fast' | 'smart' | 'creative' = 'fast',
+    options?: {
+      responseFormat?: 'json_object';
+    }
   ): Promise<string> {
     try {
       const model = this.models[modelType];
@@ -44,8 +54,9 @@ export class OpenAIService {
             { role: 'user', content: userMessage }
           ],
           max_tokens: 1000,
-          temperature: modelType === 'creative' ? 0.8 : 0.7,
-          user: userId
+          temperature: options?.responseFormat ? 0 : (modelType === 'creative' ? 0.8 : 0.7),
+          user: userId,
+          ...(options?.responseFormat ? { response_format: { type: options.responseFormat } } : {})
         },
         {
           headers: {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useI18n } from '../contexts/I18nContext';
 import {
   CalendarDaysIcon,
   ClockIcon,
@@ -59,6 +60,7 @@ interface Appointment {
 
 const Appointments: React.FC = () => {
   const { user } = useAuth();
+  const { t, language } = useI18n();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [availableDoctors, setAvailableDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +185,7 @@ const Appointments: React.FC = () => {
   });
 
   if (loading) {
-    return <LoadingSpinner text="Loading appointments..." />;
+    return <LoadingSpinner text={t('loading.appointments')} />;
   }
 
   return (
@@ -192,11 +194,11 @@ const Appointments: React.FC = () => {
       <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Appointments</h1>
+            <h1 className="text-3xl font-bold mb-2">{t('appointments.title')}</h1>
             <p className="text-blue-100">
               {user?.role === 'PATIENT' 
-                ? 'Manage your healthcare appointments and book new consultations'
-                : 'View and manage your patient appointments'
+                ? t('appointments.subtitle_patient')
+                : t('appointments.subtitle_doctor')
               }
             </p>
           </div>
@@ -206,7 +208,7 @@ const Appointments: React.FC = () => {
               className="bg-white text-blue-800 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center space-x-2"
             >
               <PlusIcon className="h-5 w-5" />
-              <span>Book Appointment</span>
+              <span>{t('appointments.book')}</span>
             </button>
           )}
         </div>
@@ -220,7 +222,7 @@ const Appointments: React.FC = () => {
               <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search appointments..."
+                placeholder={t('appointments.search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -233,16 +235,19 @@ const Appointments: React.FC = () => {
                 onChange={(e) => setFilterStatus(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="all">All Status</option>
-                <option value="SCHEDULED">Scheduled</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
+                <option value="all">{t('appointments.all_status')}</option>
+                <option value="SCHEDULED">{t('appointments.scheduled')}</option>
+                <option value="IN_PROGRESS">{t('appointments.in_progress')}</option>
+                <option value="COMPLETED">{t('appointments.completed')}</option>
+                <option value="CANCELLED">{t('appointments.cancelled')}</option>
               </select>
             </div>
           </div>
           <div className="text-sm text-gray-600">
-            {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? 's' : ''} found
+            {t('appointments.found', {
+              count: filteredAppointments.length,
+              plural: language === 'en' && filteredAppointments.length !== 1 ? 's' : ''
+            })}
           </div>
         </div>
       </div>
@@ -252,11 +257,11 @@ const Appointments: React.FC = () => {
         {filteredAppointments.length === 0 ? (
           <div className="text-center py-12">
             <CalendarDaysIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No appointments found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{t('appointments.none_title')}</h3>
             <p className="text-gray-500 mb-6">
               {user?.role === 'PATIENT' 
-                ? "You don't have any appointments yet. Book your first consultation!"
-                : "No appointments match your current filters."
+                ? t('appointments.none_patient')
+                : t('appointments.none_filters')
               }
             </p>
             {user?.role === 'PATIENT' && (
@@ -264,7 +269,7 @@ const Appointments: React.FC = () => {
                 onClick={() => setShowBookingModal(true)}
                 className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
               >
-                Book Your First Appointment
+                {t('appointments.book_first')}
               </button>
             )}
           </div>
@@ -301,17 +306,17 @@ const Appointments: React.FC = () => {
                           <span>{new Date(appointment.scheduledAt).toLocaleTimeString()}</span>
                         </div>
                         <div className="flex items-center space-x-1">
-                          <span>Duration: {appointment.duration} min</span>
+                          <span>{t('appointments.duration')}: {appointment.duration} {t('appointments.minutes')}</span>
                         </div>
                       </div>
                       {user?.role === 'PATIENT' && (
                         <div className="text-sm text-gray-600 mb-2">
-                          <span className="font-medium">Specialization:</span> {appointment.doctor.doctorProfile.specialization.join(', ')}
+                          <span className="font-medium">{t('appointments.specialization')}:</span> {appointment.doctor.doctorProfile.specialization.join(', ')}
                         </div>
                       )}
                       {appointment.symptoms.length > 0 && (
                         <div className="text-sm text-gray-600 mb-2">
-                          <span className="font-medium">Symptoms:</span> {appointment.symptoms.join(', ')}
+                          <span className="font-medium">{t('appointments.symptoms')}:</span> {appointment.symptoms.join(', ')}
                         </div>
                       )}
                       {appointment.riskLevel && (

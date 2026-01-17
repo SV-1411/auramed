@@ -5,6 +5,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { I18nProvider, useI18n } from './contexts/I18nContext';
+import { MedicineCartProvider } from './contexts/MedicineCartContext';
 
 // Pages
 import Landing from './pages/Landing';
@@ -23,6 +25,14 @@ import PredictiveHealthInsights from './pages/PredictiveHealthInsights';
 import About from './pages/About';
 import AIAppointmentBooking from './pages/AIAppointmentBooking';
 import ConsultationChat from './pages/ConsultationChat';
+import SOS from './pages/SOS';
+import AmbulanceDashboard from './pages/AmbulanceDashboard';
+import MedicineDelivery from './pages/MedicineDelivery';
+import MedicineCheckout from './pages/MedicineCheckout';
+import MedicineOrderTracking from './pages/MedicineOrderTracking';
+import PrescriptionUpload from './pages/PrescriptionUpload';
+import FreelancePatient from './pages/FreelancePatient';
+import FreelanceDoctor from './pages/FreelanceDoctor';
 
 // Components
 import Navbar from './components/Navbar';
@@ -33,15 +43,18 @@ import AuraMedLoader from './components/AuraMedLoader';
 function App() {
   return (
     <ThemeProvider>
+      <I18nProvider>
       <AuthProvider>
         <AppWithAuth />
       </AuthProvider>
+      </I18nProvider>
     </ThemeProvider>
   );
 }
 
 function AppWithAuth() {
   const { user, token } = useAuth();
+  const { dir } = useI18n();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const location = useLocation();
   const [routeLoading, setRouteLoading] = useState(false);
@@ -65,6 +78,7 @@ function AppWithAuth() {
   
   return (
     <SocketProvider user={user} token={token}>
+          <MedicineCartProvider>
           <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:bg-gradient-to-br dark:from-slate-900 dark:via-blue-900 dark:to-teal-900 transition-all duration-300">
             <AuraMedLoader active={initialLoading || routeLoading} />
             {!hideChrome && (
@@ -80,7 +94,7 @@ function AppWithAuth() {
             )}
 
             <main
-              className={`transition-all duration-300 ${user && !hideChrome ? (isSidebarOpen ? 'ml-64' : 'ml-16') : ''}`}
+              className={`transition-all duration-300 ${user && !hideChrome ? (isSidebarOpen ? (dir === 'rtl' ? 'mr-64' : 'ml-64') : (dir === 'rtl' ? 'mr-16' : 'ml-16')) : ''}`}
             >
               <Routes>
                 {/* Public Routes */}
@@ -149,18 +163,62 @@ function AppWithAuth() {
                     <ConsultationChat />
                   </ProtectedRoute>
                 } />
+
+                <Route path="/sos" element={
+                  <ProtectedRoute requiredRole="PATIENT">
+                    <SOS />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/ambulance-dashboard" element={
+                  <ProtectedRoute requiredRole="AMBULANCE">
+                    <AmbulanceDashboard />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/medicine" element={
+                  <ProtectedRoute requiredRole="PATIENT">
+                    <MedicineDelivery />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/medicine/checkout" element={
+                  <ProtectedRoute requiredRole="PATIENT">
+                    <MedicineCheckout />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/medicine/orders/:orderId" element={
+                  <ProtectedRoute requiredRole="PATIENT">
+                    <MedicineOrderTracking />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/prescriptions" element={
+                  <ProtectedRoute requiredRole="PATIENT">
+                    <PrescriptionUpload />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/freelance" element={
+                  <ProtectedRoute requiredRole="PATIENT">
+                    <FreelancePatient />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/doctor/freelance" element={
+                  <ProtectedRoute requiredRole="DOCTOR">
+                    <FreelanceDoctor />
+                  </ProtectedRoute>
+                } />
                 
                 <Route path="/video-consultation" element={
                   <ProtectedRoute>
                     <VideoConsultation />
                   </ProtectedRoute>
                 } />
-                
-                <Route path="/video/:roomId" element={
-                  <ProtectedRoute>
-                    <VideoConsultation />
-                  </ProtectedRoute>
-                } />
+
+                <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
               </Routes>
             </main>
 
@@ -190,6 +248,7 @@ function AppWithAuth() {
               }}
             />
           </div>
+          </MedicineCartProvider>
       </SocketProvider>
     );
 }
@@ -207,6 +266,8 @@ function DashboardRouter() {
       return <PatientDashboard />;
     case 'DOCTOR':
       return <DoctorDashboard />;
+    case 'AMBULANCE':
+      return <AmbulanceDashboard />;
     case 'ADMIN':
       return <AdminDashboard />;
     default:

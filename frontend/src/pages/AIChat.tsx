@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useI18n } from '../contexts/I18nContext';
 import { 
   PaperAirplaneIcon, 
   MicrophoneIcon,
@@ -25,6 +26,7 @@ interface Message {
 const AIChat: React.FC = () => {
   const { user } = useAuth();
   const { socket, isConnected, sendMessage } = useSocket();
+  const { t } = useI18n();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -231,7 +233,7 @@ const AIChat: React.FC = () => {
               <div className="mt-3 p-3 bg-white rounded border">
                 <div className="flex items-center space-x-2 mb-2">
                   <ExclamationTriangleIcon className="h-4 w-4" />
-                  <span className="text-xs font-medium text-gray-700">Risk Assessment</span>
+                  <span className="text-xs font-medium text-gray-700">{t('ai.risk_assessment')}</span>
                 </div>
                 <div className={`inline-block px-2 py-1 rounded text-xs font-medium ${
                   getRiskLevelColor(message.metadata.analysis.riskScore?.level)
@@ -262,16 +264,16 @@ const AIChat: React.FC = () => {
             <div className="flex items-center space-x-3">
               <ChatBubbleLeftRightIcon className="h-6 w-6 text-blue-600" />
               <div>
-                <h1 className="text-lg font-semibold text-gray-900">AI Health Assistant</h1>
+                <h1 className="text-lg font-semibold text-gray-900">{t('ai.title')}</h1>
                 <p className="text-sm text-gray-500">
-                  Chat with your personal AI health assistant
+                  {t('ai.subtitle')}
                 </p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
               <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
               <span className="text-xs text-gray-500">
-                {isConnected ? 'Connected' : 'Disconnected'}
+                {isConnected ? t('ai.connected') : t('ai.disconnected')}
               </span>
             </div>
           </div>
@@ -282,8 +284,8 @@ const AIChat: React.FC = () => {
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 mt-8">
               <ChatBubbleLeftRightIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p className="text-lg font-medium">Welcome to AuraMed AI</p>
-              <p className="text-sm">Start a conversation about your health concerns</p>
+              <p className="text-lg font-medium">{t('ai.welcome_title')}</p>
+              <p className="text-sm">{t('ai.welcome_subtitle')}</p>
             </div>
           ) : (
             messages.map(renderMessage)
@@ -293,7 +295,7 @@ const AIChat: React.FC = () => {
             <div className="flex justify-start mb-4">
               <div className="flex items-center space-x-2 bg-gray-100 px-4 py-2 rounded-lg">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-                <span className="text-sm text-gray-600">AI is thinking...</span>
+                <span className="text-sm text-gray-600">{t('ai.thinking')}</span>
               </div>
             </div>
           )}
@@ -311,7 +313,7 @@ const AIChat: React.FC = () => {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Describe your symptoms or ask a health question..."
+                placeholder={t('ai.placeholder')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 disabled={isLoading}
               />
@@ -352,10 +354,10 @@ const AIChat: React.FC = () => {
                 disabled={!inputMessage.trim() || isLoading}
                 className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full hover:bg-orange-200 disabled:opacity-50 transition-colors"
               >
-                Analyze Symptoms
+                {t('ai.analyze_symptoms')}
               </button>
               <span className="text-xs text-gray-500">
-                Separate multiple symptoms with commas
+                {t('ai.separate_symptoms_hint')}
               </span>
             </div>
           )}

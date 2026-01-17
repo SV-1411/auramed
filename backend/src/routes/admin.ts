@@ -7,7 +7,7 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 // Get admin dashboard stats
-router.get('/dashboard-stats', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/dashboard-stats', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const [
       totalUsers,
@@ -51,7 +51,7 @@ router.get('/dashboard-stats', authenticateToken, requireRole('admin'), async (r
 });
 
 // Get all users with pagination
-router.get('/users', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/users', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { role, status, limit = 20, offset = 0, search } = req.query;
 
@@ -101,7 +101,7 @@ router.get('/users', authenticateToken, requireRole('admin'), async (req: Authen
 });
 
 // Verify doctor
-router.put('/verify-doctor/:doctorId', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
+router.put('/verify-doctor/:doctorId', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { doctorId } = req.params;
     const { isVerified, verificationNotes } = req.body;
@@ -146,7 +146,7 @@ router.put('/verify-doctor/:doctorId', authenticateToken, requireRole('admin'), 
 });
 
 // Get system alerts
-router.get('/system-alerts', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/system-alerts', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { severity, isResolved, limit = 20, offset = 0 } = req.query;
 
@@ -180,7 +180,7 @@ router.get('/system-alerts', authenticateToken, requireRole('admin'), async (req
 });
 
 // Resolve system alert
-router.put('/system-alerts/:alertId/resolve', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
+router.put('/system-alerts/:alertId/resolve', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { alertId } = req.params;
     const { resolutionNotes } = req.body;
@@ -205,7 +205,7 @@ router.put('/system-alerts/:alertId/resolve', authenticateToken, requireRole('ad
 });
 
 // Get fraud detection reports
-router.get('/fraud-reports', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/fraud-reports', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { severity, isResolved, limit = 20, offset = 0 } = req.query;
 
@@ -238,7 +238,7 @@ router.get('/fraud-reports', authenticateToken, requireRole('admin'), async (req
 });
 
 // Update fraud report status
-router.put('/fraud-reports/:reportId', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
+router.put('/fraud-reports/:reportId', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { reportId } = req.params;
     const { status } = req.body;
@@ -265,7 +265,7 @@ router.put('/fraud-reports/:reportId', authenticateToken, requireRole('admin'), 
 });
 
 // Get platform analytics
-router.get('/analytics', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/analytics', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { period = '30d' } = req.query;
     
@@ -323,7 +323,7 @@ router.get('/analytics', authenticateToken, requireRole('admin'), async (req: Au
 });
 
 // Suspend/unsuspend user
-router.put('/users/:userId/suspend', authenticateToken, requireRole('admin'), async (req: AuthenticatedRequest, res: Response) => {
+router.put('/users/:userId/suspend', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { userId } = req.params;
     const { isActive } = req.body;

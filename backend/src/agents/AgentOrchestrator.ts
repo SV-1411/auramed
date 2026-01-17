@@ -322,6 +322,9 @@ export class AgentOrchestrator {
         if (userType === 'doctor') {
           socket.join('emergency-doctors');
         }
+        if (userType === 'ambulance') {
+          socket.join('ambulance-room');
+        }
       });
     });
   }

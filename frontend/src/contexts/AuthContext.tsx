@@ -2,11 +2,35 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+function safeStorageGet(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeStorageSet(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // ignore
+  }
+}
+
+function safeStorageRemove(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
 interface User {
   id: string;
   email: string;
   phone: string;
-  role: 'PATIENT' | 'DOCTOR' | 'ADMIN';
+  role: 'PATIENT' | 'DOCTOR' | 'AMBULANCE' | 'ADMIN';
   profile: any;
 }
 
@@ -73,7 +97,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 
 const initialState: AuthState = {
   user: null,
-  token: localStorage.getItem('token'),
+  token: safeStorageGet('token'),
   loading: false,
   isAuthenticated: false,
 };
@@ -96,7 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Check for existing token on mount
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = safeStorageGet('token');
     if (token) {
       verifyToken(token);
     }
@@ -117,7 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       });
     } catch (error) {
-      localStorage.removeItem('token');
+      safeStorageRemove('token');
       dispatch({ type: 'AUTH_FAILURE' });
     }
   };
@@ -133,7 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const { user, token } = response.data.data;
 
-      localStorage.setItem('token', token);
+      safeStorageSet('token', token);
 
       dispatch({
         type: 'AUTH_SUCCESS',
@@ -165,7 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const { user, token } = response.data.data;
       
-      localStorage.setItem('token', token);
+      safeStorageSet('token', token);
       
       dispatch({
         type: 'AUTH_SUCCESS',
@@ -184,7 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       // Clear token and state immediately to prevent further requests
-      localStorage.removeItem('token');
+      safeStorageRemove('token');
       dispatch({ type: 'LOGOUT' });
       
       // Then attempt API logout (but don't wait for it)
@@ -195,7 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.success('Logged out successfully');
     } catch (error) {
       // Always complete logout even if API call fails
-      localStorage.removeItem('token');
+      safeStorageRemove('token');
       dispatch({ type: 'LOGOUT' });
       toast.success('Logged out successfully');
     }

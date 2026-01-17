@@ -60,12 +60,21 @@ const Profile: React.FC = () => {
     familyMembers: []
   });
 
+  const toDateInputValue = (value: string) => {
+    if (!value) return '';
+    // Accept either YYYY-MM-DD or ISO timestamp
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
+  };
+
   useEffect(() => {
     if (user?.profile) {
       setProfileData({
         firstName: user.profile.firstName || '',
         lastName: user.profile.lastName || '',
-        dateOfBirth: user.profile.dateOfBirth || '',
+        dateOfBirth: toDateInputValue(user.profile.dateOfBirth || ''),
         gender: user.profile.gender || '',
         phone: user.phone || '',
         emergencyContact: user.profile.emergencyContact || '',

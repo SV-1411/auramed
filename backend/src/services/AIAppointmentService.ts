@@ -37,6 +37,8 @@ export interface AppointmentRequest {
   preferredTime?: Date;
   urgency?: 'ROUTINE' | 'URGENT' | 'EMERGENCY';
   maxDistance?: number; // in km
+  maxFee?: number;
+  preferredFee?: number;
 }
 
 export class AIAppointmentService {
@@ -176,21 +178,33 @@ export class AIAppointmentService {
       // Score and rank doctors
       const recommendations: DoctorRecommendation[] = [];
 
+      const patientHistory = await this.getPatientHistory(request.patientId).catch(() => null);
+
       for (const doctor of doctors) {
         const d: any = doctor as any; // TS safety for optional profile fields
-        const matchScore = await this.calculateDoctorMatchScore(d, analysis, request);
-        const availableSlots = await this.getAvailableSlots(d.id, analysis.urgency);
+        const consultationFee = d.doctorProfile?.consultationFee || 500;
+        if (typeof request.maxFee === 'number' && consultationFee > request.maxFee) {
+          continue;
+        }
+
+        const distance = request.patientLocation
+          ? await this.calculateDistance(request.patientLocation, (d.doctorProfile && (d.doctorProfile as any).location) || undefined)
+          : undefined;
+
+        // Enforce maxDistance filter if provided and distance is known
+        if (request.maxDistance && distance !== undefined && distance > request.maxDistance) {
+          continue;
+        }
+
+        const availableSlots = await this.getAvailableSlotsForDoctor(d, analysis.urgency);
+        const matchScore = await this.calculateDoctorMatchScore(d, analysis, request, {
+          distance,
+          consultationFee,
+          availableSlots,
+          patientHistory
+        });
         
         if (availableSlots.length > 0 || analysis.severity === 'CRITICAL') {
-          const distance = request.patientLocation 
-            ? await this.calculateDistance(request.patientLocation, (d.doctorProfile && (d.doctorProfile as any).location) || undefined)
-            : undefined;
-
-          // Enforce maxDistance filter if provided and distance is known
-          if (request.maxDistance && distance !== undefined && distance > request.maxDistance) {
-            continue;
-          }
-
           recommendations.push({
             doctorId: d.id,
             doctor: {
@@ -207,8 +221,13 @@ export class AIAppointmentService {
             distance,
             specializations: d.doctorProfile?.specialization || [],
             rating: d.doctorProfile?.qualityScore || 0,
-            consultationFee: d.doctorProfile?.consultationFee || 500,
-            reasonForRecommendation: this.generateRecommendationReason(matchScore, analysis, d)
+            consultationFee,
+            reasonForRecommendation: this.generateRecommendationReason(matchScore, analysis, d, {
+              distance,
+              consultationFee,
+              availableSlots,
+              patientHistory
+            })
           });
         }
       }
@@ -242,39 +261,85 @@ export class AIAppointmentService {
   private async calculateDoctorMatchScore(
     doctor: any, 
     analysis: SymptomAnalysisResult, 
-    request: AppointmentRequest
+    request: AppointmentRequest,
+    ctx?: {
+      distance?: number;
+      consultationFee: number;
+      availableSlots: Date[];
+      patientHistory: any;
+    }
   ): Promise<number> {
+    const context = ctx || {
+      distance: undefined,
+      consultationFee: doctor.doctorProfile?.consultationFee || 500,
+      availableSlots: [],
+      patientHistory: null
+    };
+
     let score = 0;
 
-    // Specialization match (40 points)
+    // Specialization match (35)
     const doctorSpecs = doctor.doctorProfile?.specialization || [];
-    const matchingSpecs = analysis.recommendedSpecializations.filter(spec => 
-      doctorSpecs.some((dSpec: string) => dSpec.toLowerCase().includes(spec.toLowerCase()))
-    );
-    score += (matchingSpecs.length / analysis.recommendedSpecializations.length) * 40;
+    const recSpecs = analysis.recommendedSpecializations || [];
+    const matchingSpecs = recSpecs.length
+      ? recSpecs.filter((spec) => doctorSpecs.some((dSpec: string) => dSpec.toLowerCase().includes(String(spec).toLowerCase())))
+      : [];
+    const specRatio = recSpecs.length ? matchingSpecs.length / recSpecs.length : 0.5;
+    score += specRatio * 35;
 
-    // Experience and rating (30 points)
+    // Experience + rating (20)
     const experience = doctor.doctorProfile?.experience || 0;
     const rating = doctor.doctorProfile?.qualityScore || 0;
-    score += Math.min(experience / 10, 1) * 15; // Max 15 points for experience
-    score += (rating / 5) * 15; // Max 15 points for rating
+    score += Math.min(experience / 12, 1) * 8;
+    score += Math.min(Math.max(rating, 0) / 5, 1) * 12;
 
-    // Availability (20 points)
-    const hasImmediateAvailability = await this.checkImmediateAvailability(doctor.id);
-    if (hasImmediateAvailability) score += 20;
-    else {
-      const nextSlot = await this.getNextAvailableSlot(doctor.id);
-      if (nextSlot && nextSlot < new Date(Date.now() + 24 * 60 * 60 * 1000)) {
-        score += 10; // Available within 24 hours
-      }
+    // Availability (20)
+    const now = Date.now();
+    const soonest = context.availableSlots[0];
+    if (analysis.urgency === 'EMERGENCY') {
+      const hasImmediateAvailability = await this.checkImmediateAvailability(doctor.id);
+      score += hasImmediateAvailability ? 20 : 0;
+    } else if (soonest) {
+      const minutes = Math.max(0, Math.round((soonest.getTime() - now) / 60000));
+      if (minutes <= 60) score += 20;
+      else if (minutes <= 240) score += 14;
+      else if (minutes <= 1440) score += 8;
+      else score += 3;
     }
 
-    // Urgency match (10 points)
-    if (analysis.urgency === 'EMERGENCY' && hasImmediateAvailability) {
-      score += 10;
+    // Distance (15)
+    if (typeof context.distance === 'number' && Number.isFinite(context.distance)) {
+      const maxD = request.maxDistance ?? 50;
+      const d = Math.min(Math.max(context.distance, 0), 999);
+      const normalized = Math.max(0, Math.min(1, 1 - d / Math.max(1, maxD)));
+      score += normalized * 15;
+    } else {
+      score += 4;
     }
 
-    return Math.round(score);
+    // Fee preference (10)
+    if (typeof request.preferredFee === 'number' && request.preferredFee > 0) {
+      const diff = Math.abs(context.consultationFee - request.preferredFee);
+      const normalized = Math.max(0, 1 - diff / Math.max(1, request.preferredFee));
+      score += normalized * 10;
+    } else if (typeof request.maxFee === 'number' && request.maxFee > 0) {
+      const normalized = Math.max(0, 1 - context.consultationFee / request.maxFee);
+      score += normalized * 10;
+    } else {
+      score += 5;
+    }
+
+    // Patient ↔ doctor history (up to 10)
+    const affinity = this.calculatePatientDoctorAffinity(context.patientHistory, doctor.id);
+    score += affinity;
+
+    // Urgency match (bonus up to 5)
+    if (analysis.urgency === 'EMERGENCY') {
+      const hasImmediateAvailability = await this.checkImmediateAvailability(doctor.id);
+      if (hasImmediateAvailability) score += 5;
+    }
+
+    return Math.max(0, Math.min(100, Math.round(score)));
   }
 
   /**
@@ -457,23 +522,69 @@ export class AIAppointmentService {
   }
 
   // Helper methods
-  private async getAvailableSlots(doctorId: string, urgency: string): Promise<Date[]> {
-    // Implementation for getting available slots
-    const slots: Date[] = [];
+  private parseTimeToMinutes(time: string): number {
+    const [hh, mm] = String(time || '').split(':').map((x) => parseInt(x, 10));
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 0;
+    return Math.max(0, Math.min(23, hh)) * 60 + Math.max(0, Math.min(59, mm));
+  }
+
+  private addMinutesToDate(base: Date, minutes: number) {
+    return new Date(base.getTime() + minutes * 60 * 1000);
+  }
+
+  private startOfDay(d: Date) {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  }
+
+  private buildCandidateSlotsFromAvailability(availabilitySlots: any[], days: number, slotMinutes: number): Date[] {
     const now = new Date();
-    
-    if (urgency === 'EMERGENCY') {
-      // Immediate availability
-      slots.push(new Date(now.getTime() + 5 * 60 * 1000));
-    } else {
-      // Next 7 days availability
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
-        slots.push(date);
+    const candidates: Date[] = [];
+    for (let dayOffset = 0; dayOffset < days; dayOffset++) {
+      const date = this.startOfDay(this.addMinutesToDate(now, dayOffset * 24 * 60));
+      const dow = date.getDay();
+      const daySlots = (availabilitySlots || []).filter((s: any) => s?.isAvailable && s?.dayOfWeek === dow);
+      for (const s of daySlots) {
+        const startMin = this.parseTimeToMinutes(s.startTime);
+        const endMin = this.parseTimeToMinutes(s.endTime);
+        for (let m = startMin; m + slotMinutes <= endMin; m += slotMinutes) {
+          const candidate = this.addMinutesToDate(date, m);
+          if (candidate.getTime() >= now.getTime() + 2 * 60 * 1000) {
+            candidates.push(candidate);
+          }
+        }
       }
     }
-    
-    return slots;
+    return candidates.sort((a, b) => a.getTime() - b.getTime());
+  }
+
+  private async getAvailableSlotsForDoctor(doctor: any, urgency: string): Promise<Date[]> {
+    const now = new Date();
+    if (urgency === 'EMERGENCY') {
+      const hasImmediateAvailability = await this.checkImmediateAvailability(doctor.id);
+      return hasImmediateAvailability ? [new Date(now.getTime() + 5 * 60 * 1000)] : [];
+    }
+
+    const availabilitySlots = doctor?.doctorProfile?.availabilitySlots || [];
+    const candidates = this.buildCandidateSlotsFromAvailability(availabilitySlots, 7, 30);
+    if (!candidates.length) return [];
+
+    const endWindow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const existing = await this.db.appointment.findMany({
+      where: {
+        doctorId: doctor.id,
+        scheduledAt: { gte: now, lte: endWindow },
+        status: { in: ['SCHEDULED', 'IN_PROGRESS'] }
+      },
+      select: { scheduledAt: true }
+    });
+    const taken = new Set(existing.map((a: any) => new Date(a.scheduledAt).getTime()));
+
+    const free = candidates.filter((c) => !taken.has(c.getTime()));
+
+    // Prefer the earliest few slots
+    return free.slice(0, 8);
   }
 
   private async checkImmediateAvailability(doctorId: string): Promise<boolean> {
@@ -494,9 +605,18 @@ export class AIAppointmentService {
     return !conflictingAppointment;
   }
 
-  private async getNextAvailableSlot(doctorId: string): Promise<Date | null> {
-    // Simplified implementation
-    return new Date(Date.now() + 24 * 60 * 60 * 1000);
+  private calculatePatientDoctorAffinity(patientHistory: any, doctorId: string): number {
+    if (!patientHistory?.appointments || !Array.isArray(patientHistory.appointments)) return 0;
+    const appts = patientHistory.appointments.filter((a: any) => a?.doctorId === doctorId);
+    if (!appts.length) return 0;
+
+    const completed = appts.filter((a: any) => a?.status === 'COMPLETED').length;
+    const recentCount = appts.length;
+
+    let score = 0;
+    score += Math.min(6, recentCount * 2);
+    score += Math.min(4, completed);
+    return Math.min(10, score);
   }
 
   private async checkDoctorAvailability(doctorId: string, scheduledAt: Date): Promise<boolean> {
@@ -683,23 +803,44 @@ export class AIAppointmentService {
     }
   }
 
-  private generateRecommendationReason(score: number, analysis: SymptomAnalysisResult, doctor: any): string {
-    const reasons = [];
-    
-    if (score >= 80) reasons.push('Excellent match for your symptoms');
+  private generateRecommendationReason(
+    score: number,
+    analysis: SymptomAnalysisResult,
+    doctor: any,
+    ctx?: { distance?: number; consultationFee: number; availableSlots: Date[]; patientHistory: any }
+  ): string {
+    const reasons: string[] = [];
+
+    if (score >= 85) reasons.push('Excellent match for your symptoms');
+    else if (score >= 70) reasons.push('Strong match for your symptoms');
+
     if (doctor.doctorProfile?.qualityScore >= 4.5) reasons.push('Highly rated by patients');
     if (doctor.doctorProfile?.experience >= 10) reasons.push('Extensive experience');
-    
-    const matchingSpecs = analysis.recommendedSpecializations.filter(spec => 
-      doctor.doctorProfile?.specialization?.some((dSpec: string) => 
-        dSpec.toLowerCase().includes(spec.toLowerCase())
-      )
+
+    const matchingSpecs = (analysis.recommendedSpecializations || []).filter((spec) =>
+      doctor.doctorProfile?.specialization?.some((dSpec: string) => dSpec.toLowerCase().includes(String(spec).toLowerCase()))
     );
-    
     if (matchingSpecs.length > 0) {
-      reasons.push(`Specializes in ${matchingSpecs.join(', ')}`);
+      reasons.push(`Specializes in ${matchingSpecs.slice(0, 2).join(', ')}`);
     }
-    
+
+    if (ctx?.availableSlots?.length) {
+      const mins = Math.max(0, Math.round((ctx.availableSlots[0].getTime() - Date.now()) / 60000));
+      if (mins <= 60) reasons.push('Available soon');
+      else reasons.push('Available in the next few days');
+    }
+
+    if (typeof ctx?.distance === 'number' && Number.isFinite(ctx.distance) && ctx.distance < 999) {
+      reasons.push(`${ctx.distance.toFixed(1)} km away`);
+    }
+
+    if (typeof ctx?.consultationFee === 'number') {
+      reasons.push(`Fee ₹${Math.round(ctx.consultationFee)}`);
+    }
+
+    const affinity = this.calculatePatientDoctorAffinity(ctx?.patientHistory, doctor.id);
+    if (affinity >= 6) reasons.push('You have consulted this doctor before');
+
     return reasons.join(' • ') || 'Good general match for your needs';
   }
 

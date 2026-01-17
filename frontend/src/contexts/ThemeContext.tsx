@@ -1,5 +1,21 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+function safeStorageGet(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeStorageSet(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // ignore
+  }
+}
+
 type Theme = 'light' | 'dark';
 
 interface ThemeContextType {
@@ -25,7 +41,7 @@ interface ThemeProviderProps {
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
     // Check localStorage first, then system preference
-    const savedTheme = localStorage.getItem('auramed-theme') as Theme;
+    const savedTheme = safeStorageGet('auramed-theme') as Theme;
     if (savedTheme) {
       return savedTheme;
     }
@@ -48,14 +64,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
     
     // Save to localStorage
-    localStorage.setItem('auramed-theme', theme);
+    safeStorageSet('auramed-theme', theme);
   }, [theme]);
 
   useEffect(() => {
     // Listen for system theme changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('auramed-theme')) {
+      if (!safeStorageGet('auramed-theme')) {
         setThemeState(e.matches ? 'dark' : 'light');
       }
     };

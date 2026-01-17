@@ -16,7 +16,7 @@ router.post('/register', [
   body('phone').customSanitizer((v) => String(v)).matches(/^\+?\d{10,15}$/).withMessage('Phone must be 10-15 digits'),
   body('password').isLength({ min: 8 }),
   // Allow role in any case
-  body('role').customSanitizer((v) => (typeof v === 'string' ? v.toUpperCase() : v)).isIn(['PATIENT', 'DOCTOR', 'ADMIN']),
+  body('role').customSanitizer((v) => (typeof v === 'string' ? v.toUpperCase() : v)).isIn(['PATIENT', 'DOCTOR', 'AMBULANCE', 'ADMIN']),
   body('firstName').notEmpty().trim(),
   body('lastName').notEmpty().trim()
 ], async (req: Request, res: Response, next: NextFunction) => {
@@ -96,6 +96,19 @@ router.post('/register', [
             }
           }
         }),
+        ...(role === 'AMBULANCE' && {
+          ambulanceProfile: {
+            create: {
+              firstName,
+              lastName,
+              organization: profileData.organization ? String(profileData.organization) : undefined,
+              vehicleNumber: profileData.vehicleNumber ? String(profileData.vehicleNumber) : undefined,
+              driverName: profileData.driverName ? String(profileData.driverName) : undefined,
+              phoneAlt: profileData.phoneAlt ? String(profileData.phoneAlt) : undefined,
+              isOnDuty: profileData.isOnDuty !== undefined ? Boolean(profileData.isOnDuty) : true
+            }
+          }
+        }),
         ...(role === 'ADMIN' && {
           adminProfile: {
             create: {
@@ -110,6 +123,7 @@ router.post('/register', [
       include: {
         patientProfile: true,
         doctorProfile: true,
+        ambulanceProfile: true,
         adminProfile: true
       }
     });
@@ -143,7 +157,7 @@ router.post('/register', [
           email: user.email,
           phone: user.phone,
           role: user.role,
-          profile: user.patientProfile || user.doctorProfile || user.adminProfile
+          profile: user.patientProfile || user.doctorProfile || user.ambulanceProfile || user.adminProfile
         },
         token
       }
@@ -173,6 +187,7 @@ router.post('/login', [
       include: {
         patientProfile: true,
         doctorProfile: true,
+        ambulanceProfile: true,
         adminProfile: true
       }
     });
@@ -216,7 +231,7 @@ router.post('/login', [
           email: user.email,
           phone: user.phone,
           role: user.role,
-          profile: user.patientProfile || user.doctorProfile || user.adminProfile
+          profile: user.patientProfile || user.doctorProfile || user.ambulanceProfile || user.adminProfile
         },
         token
       }
@@ -320,6 +335,7 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
             qualityMetrics: true
           }
         },
+        ambulanceProfile: true,
         adminProfile: true
       }
     });
@@ -336,7 +352,7 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
           email: user.email,
           phone: user.phone,
           role: user.role,
-          profile: user.patientProfile || user.doctorProfile || user.adminProfile,
+          profile: user.patientProfile || user.doctorProfile || user.ambulanceProfile || user.adminProfile,
           createdAt: user.createdAt
         }
       }

@@ -12,6 +12,8 @@ router.post('/analyze-symptoms', authenticateToken, [
   body('symptoms').isArray().notEmpty().withMessage('Symptoms array is required'),
   body('patientLocation').optional().isObject(),
   body('maxDistance').optional().isNumeric(),
+  body('maxFee').optional().isNumeric(),
+  body('preferredFee').optional().isNumeric(),
   body('urgency').optional().isIn(['ROUTINE', 'URGENT', 'EMERGENCY'])
 ], async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -21,13 +23,15 @@ router.post('/analyze-symptoms', authenticateToken, [
     }
 
     const patientId = (req as any).user.userId;
-    const { symptoms, patientLocation, maxDistance, urgency } = req.body;
+    const { symptoms, patientLocation, maxDistance, maxFee, preferredFee, urgency } = req.body;
 
     const request = {
       patientId,
       symptoms,
       patientLocation,
       maxDistance: maxDistance || 50, // Default 50km radius
+      maxFee: typeof maxFee === 'number' ? maxFee : undefined,
+      preferredFee: typeof preferredFee === 'number' ? preferredFee : undefined,
       urgency: urgency || 'ROUTINE'
     };
 

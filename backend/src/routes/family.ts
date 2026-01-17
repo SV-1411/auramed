@@ -29,8 +29,21 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'firstName, lastName, and relationship are required' });
     }
 
-    const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
-    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
+    let patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
+    if (!patientProfile) {
+      // Auto-create a minimal patient profile so the Family page doesn't 400 for new users
+      patientProfile = await prisma.patientProfile.create({
+        data: {
+          userId,
+          firstName: 'Patient',
+          lastName: 'User',
+          dateOfBirth: new Date('1990-01-01'),
+          gender: 'OTHER',
+          emergencyContact: '',
+          preferredLanguage: 'en'
+        }
+      });
+    }
 
     const familyMember = await prisma.familyMember.create({
       data: {
@@ -67,8 +80,21 @@ router.get('/', authenticateToken, async (req, res) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
-    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
+    let patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
+    if (!patientProfile) {
+      // Auto-create a minimal profile so Family page loads for first-time users
+      patientProfile = await prisma.patientProfile.create({
+        data: {
+          userId,
+          firstName: 'Patient',
+          lastName: 'User',
+          dateOfBirth: new Date('1990-01-01'),
+          gender: 'OTHER',
+          emergencyContact: '',
+          preferredLanguage: 'en'
+        }
+      });
+    }
 
     const familyMembers = await prisma.familyMember.findMany({
       where: {

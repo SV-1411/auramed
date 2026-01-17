@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useI18n } from '../contexts/I18nContext';
 import axios from 'axios';
 import {
   ChatBubbleLeftRightIcon,
@@ -54,6 +55,8 @@ interface HealthMetrics {
 
 const PatientDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useI18n();
+  const navigate = useNavigate();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [healthInsights, setHealthInsights] = useState<HealthInsight[]>([]);
   const [healthMetrics, setHealthMetrics] = useState<HealthMetrics | null>(null);
@@ -154,10 +157,10 @@ const PatientDashboard: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
         <div className="relative z-10">
           <h1 className="text-4xl font-bold mb-3 tracking-tight">
-            Welcome back, {user?.profile.firstName}!
+            {t('patient.welcome', { name: user?.profile.firstName || '' })}
           </h1>
           <p className="text-sapphire-100 text-lg opacity-90">
-            Your AI-powered health assistant is here to help you manage your wellness journey.
+            {t('patient.subtitle')}
           </p>
         </div>
       </div>
@@ -175,8 +178,8 @@ const PatientDashboard: React.FC = () => {
               <ChatBubbleLeftRightIcon className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-sapphire-700 dark:group-hover:text-sapphire-300 transition-colors">AI Health Chat</h3>
-              <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">Get instant health guidance</p>
+              <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-sapphire-700 dark:group-hover:text-sapphire-300 transition-colors">{t('patient.quick.ai_chat')}</h3>
+              <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{t('patient.quick.ai_chat_sub')}</p>
             </div>
           </div>
         </Link>
@@ -192,21 +195,25 @@ const PatientDashboard: React.FC = () => {
               <CalendarDaysIcon className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-sapphire-700 dark:group-hover:text-sapphire-300 transition-colors">Book Appointment</h3>
-              <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">Schedule with top doctors</p>
+              <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-sapphire-700 dark:group-hover:text-sapphire-300 transition-colors">{t('patient.quick.book_appointment')}</h3>
+              <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{t('patient.quick.book_appointment_sub')}</p>
             </div>
           </div>
         </Link>
 
-        <button className="group relative bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-light-border dark:border-dark-border hover:shadow-2xl hover:border-sapphire-300 dark:hover:border-sapphire-600 transition-all duration-300 overflow-hidden" style={{ willChange: 'transform' }}>
+        <button
+          onClick={() => navigate('/sos')}
+          className="group relative bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-light-border dark:border-dark-border hover:shadow-2xl hover:border-sapphire-300 dark:hover:border-sapphire-600 transition-all duration-300 overflow-hidden"
+          style={{ willChange: 'transform' }}
+        >
           <div className="absolute inset-0 bg-gradient-to-br from-sapphire-50/50 to-transparent dark:from-sapphire-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           <div className="relative z-10 flex items-center space-x-4">
             <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
               <PlusIcon className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-red-700 dark:group-hover:text-red-300 transition-colors">Emergency</h3>
-              <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">Urgent consultation</p>
+              <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-red-700 dark:group-hover:text-red-300 transition-colors">{t('patient.quick.emergency')}</h3>
+              <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{t('patient.quick.emergency_sub')}</p>
             </div>
           </div>
         </button>
@@ -217,12 +224,12 @@ const PatientDashboard: React.FC = () => {
         <div className="group bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl focus-within:ring-2 focus-within:ring-sapphire-400" style={{ willChange: 'transform' }}>
           <div className="p-6 border-b border-light-border dark:border-dark-border">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-light-text-primary dark:text-dark-text-primary">Recent Appointments</h2>
+              <h2 className="text-xl font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.recent_appointments')}</h2>
               <Link
                 to="/appointments"
                 className="text-sm text-sapphire-600 dark:text-sapphire-400 hover:text-sapphire-700 dark:hover:text-sapphire-300 font-semibold transition-colors"
               >
-                View all
+                {t('common.view_all')}
               </Link>
             </div>
           </div>
@@ -231,12 +238,12 @@ const PatientDashboard: React.FC = () => {
             {appointments.length === 0 ? (
               <div className="text-center py-8">
                 <CalendarDaysIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No appointments yet</p>
+                <p className="text-gray-500">{t('patient.no_appointments')}</p>
                 <Link
                   to="/appointments"
                   className="text-sapphire-600 dark:text-sapphire-400 hover:text-sapphire-700 dark:hover:text-sapphire-300 text-sm font-semibold transition-colors"
                 >
-                  Book your first appointment
+                  {t('patient.book_first')}
                 </Link>
               </div>
             ) : (
@@ -259,7 +266,7 @@ const PatientDashboard: React.FC = () => {
                           {appointment.doctor.doctorProfile.specialization.join(', ')}
                         </p>
                         <p className="text-xs text-gray-500" title={`${new Date(appointment.scheduledAt).toLocaleString()}`}>
-                          {new Date(appointment.scheduledAt).toLocaleDateString()} at{' '}
+                          {new Date(appointment.scheduledAt).toLocaleDateString()} {t('common.at')}{' '}
                           {new Date(appointment.scheduledAt).toLocaleTimeString()}
                         </p>
                       </div>
@@ -270,7 +277,7 @@ const PatientDashboard: React.FC = () => {
                       </span>
                       {appointment.riskLevel && (
                         <p className={`text-xs font-medium mt-1 ${getRiskColor(appointment.riskLevel)}`}>
-                          {appointment.riskLevel} Risk
+                          {appointment.riskLevel} {t('common.risk')}
                         </p>
                       )}
                     </div>
@@ -285,9 +292,9 @@ const PatientDashboard: React.FC = () => {
         <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border" aria-live="polite">
           <div className="p-6 border-b border-light-border dark:border-dark-border">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-light-text-primary dark:text-dark-text-primary">Health Insights</h2>
+              <h2 className="text-xl font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.health_insights')}</h2>
               <button className="text-sm text-sapphire-600 dark:text-sapphire-400 hover:text-sapphire-700 dark:hover:text-sapphire-300 font-semibold transition-colors">
-                View all
+                {t('common.view_all')}
               </button>
             </div>
           </div>
@@ -296,10 +303,8 @@ const PatientDashboard: React.FC = () => {
             {healthInsights.length === 0 ? (
               <div className="text-center py-8">
                 <InformationCircleIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No health insights yet</p>
-                <p className="text-sm text-gray-400">
-                  Start chatting with AI to get personalized insights
-                </p>
+                <p className="text-gray-500">{t('patient.no_insights')}</p>
+                <p className="text-sm text-gray-400">{t('patient.no_insights_sub')}</p>
               </div>
             ) : (
               <div className="space-y-4" role="list" aria-label="Health insights list">
@@ -318,14 +323,14 @@ const PatientDashboard: React.FC = () => {
                         <div className="flex items-center space-x-2 mt-2">
                           <span className="text-xs text-gray-500 capitalize">{insight.type}</span>
                           {!insight.isRead && (
-                            <span className="w-2 h-2 bg-blue-500 rounded-full" title="Unread"></span>
+                            <span className="w-2 h-2 bg-blue-500 rounded-full" title={t('common.unread')}></span>
                           )}
                         </div>
                       </div>
                     </button>
                     {!insight.isRead && (
                       <button onClick={() => markInsightRead(insight.id)} className="text-xs text-sapphire-600 hover:text-sapphire-700 dark:text-sapphire-400 dark:hover:text-sapphire-300 font-semibold">
-                        Mark as read
+                        {t('common.mark_as_read')}
                       </button>
                     )}
                   </div>
@@ -341,7 +346,7 @@ const PatientDashboard: React.FC = () => {
         {/* Health Score */}
         <div className="group bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl" style={{ willChange: 'transform' }}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">Health Score</h3>
+            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.health_score')}</h3>
             <HeartIcon className="h-6 w-6 text-red-500" />
           </div>
           <div className="text-center">
@@ -360,10 +365,10 @@ const PatientDashboard: React.FC = () => {
                 <span className="text-3xl font-bold text-gray-800 dark:text-gray-200" title="Overall health score (0-100)">{healthMetrics?.healthScore || 0}</span>
               </div>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Overall Health Score</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{t('patient.overall_health_score')}</p>
             <div className="mt-2">
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" title="Change vs last checkup">
-                Stable
+                {t('patient.stable')}
               </span>
             </div>
           </div>
@@ -372,26 +377,26 @@ const PatientDashboard: React.FC = () => {
         {/* Vital Signs */}
         <div className="group bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl" style={{ willChange: 'transform' }}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">Vital Signs</h3>
+            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.vital_signs')}</h3>
             <ChartBarIcon className="h-6 w-6 text-blue-500" />
           </div>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Blood Pressure</span>
-              <span className="font-semibold text-green-600" title="Systolic/Diastolic">{healthMetrics?.bloodPressure || 'N/A'}</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">{t('patient.blood_pressure')}</span>
+              <span className="font-semibold text-green-600" title="Systolic/Diastolic">{healthMetrics?.bloodPressure || t('common.na')}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Heart Rate</span>
-              <span className="font-semibold text-blue-600" title="Beats per minute">{healthMetrics?.heartRate || 0} bpm</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">{t('patient.heart_rate')}</span>
+              <span className="font-semibold text-blue-600" title="Beats per minute">{healthMetrics?.heartRate || 0} {t('common.bpm')}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">BMI</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">{t('patient.bmi')}</span>
               <span className="font-semibold text-purple-600" title="Body Mass Index">{healthMetrics?.bmi || 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Last Checkup</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">{t('patient.last_checkup')}</span>
               <span className="font-semibold text-gray-700 dark:text-gray-300">
-                {healthMetrics?.lastCheckup ? new Date(healthMetrics.lastCheckup).toLocaleDateString() : 'N/A'}
+                {healthMetrics?.lastCheckup ? new Date(healthMetrics.lastCheckup).toLocaleDateString() : t('common.na')}
               </span>
             </div>
           </div>
@@ -400,25 +405,25 @@ const PatientDashboard: React.FC = () => {
         {/* Quick Stats */}
         <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border p-6" style={{ willChange: 'transform' }}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">Quick Stats</h3>
+            <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.quick_stats')}</h3>
             <ShieldCheckIcon className="h-6 w-6 text-green-500" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center p-3 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
               <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300" title="Completed visits">{appointments.filter(a => a.status === 'completed').length}</div>
-              <div className="text-xs text-emerald-600 dark:text-emerald-400">Visits</div>
+              <div className="text-xs text-emerald-600 dark:text-emerald-400">{t('patient.visits')}</div>
             </div>
             <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
               <div className="text-2xl font-bold text-blue-700 dark:text-blue-300" title="Upcoming appointments">{appointments.filter(a => a.status === 'scheduled').length}</div>
-              <div className="text-xs text-blue-600 dark:text-blue-400">Upcoming</div>
+              <div className="text-xs text-blue-600 dark:text-blue-400">{t('patient.upcoming')}</div>
             </div>
             <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
               <div className="text-2xl font-bold text-purple-700 dark:text-purple-300" title="Current medications">{healthMetrics?.medications?.length || 0}</div>
-              <div className="text-xs text-purple-600 dark:text-purple-400">Medications</div>
+              <div className="text-xs text-purple-600 dark:text-purple-400">{t('patient.medications')}</div>
             </div>
             <div className="text-center p-3 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
               <div className="text-2xl font-bold text-orange-700 dark:text-orange-300" title="Chronic conditions">{healthMetrics?.chronicConditions?.length || 0}</div>
-              <div className="text-xs text-orange-600 dark:text-orange-400">Conditions</div>
+              <div className="text-xs text-orange-600 dark:text-orange-400">{t('patient.conditions')}</div>
             </div>
           </div>
         </div>
@@ -430,37 +435,37 @@ const PatientDashboard: React.FC = () => {
         <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border p-6" style={{ willChange: 'transform' }}>
           <div className="flex items-center justify-between mb-4">
             <button className="flex items-center space-x-2" onClick={() => setMedOpen(v => !v)} aria-expanded={medOpen} aria-controls="med-sec">
-              <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">Medications & Allergies</h3>
+              <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.medications_allergies')}</h3>
               <ChevronRightIcon className={`h-5 w-5 text-gray-500 transition-transform ${medOpen ? 'transform rotate-90' : ''}`} />
             </button>
             <BeakerIcon className="h-6 w-6 text-purple-500" />
           </div>
           <div id="med-sec" className="space-y-4 transition-all duration-300" style={{ maxHeight: medOpen ? '1000px' : '0', overflow: 'hidden' }}>
             <div>
-              <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Current Medications</h4>
+              <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">{t('patient.current_medications')}</h4>
               <div className="flex flex-wrap gap-2">
                 {(healthMetrics?.medications ?? []).length > 0 ? (
                   (healthMetrics?.medications ?? []).map((med, index) => (
-                    <span key={index} className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm transition-transform duration-150 hover:scale-105">
+                    <span key={`${med}-${index}`} className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm transition-transform duration-150 hover:scale-105">
                       {med}
                     </span>
                   ))
                 ) : (
-                  <span className="text-gray-500 text-sm">No medications recorded</span>
+                  <span className="text-gray-500 text-sm">{t('patient.no_medications_recorded')}</span>
                 )}
               </div>
             </div>
             <div>
-              <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Known Allergies</h4>
+              <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">{t('patient.known_allergies')}</h4>
               <div className="flex flex-wrap gap-2">
                 {(healthMetrics?.allergies ?? []).length > 0 ? (
                   (healthMetrics?.allergies ?? []).map((allergy, index) => (
-                    <span key={index} className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-sm transition-transform duration-150 hover:scale-105">
+                    <span key={`${allergy}-${index}`} className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-sm transition-transform duration-150 hover:scale-105">
                       {allergy}
                     </span>
                   ))
                 ) : (
-                  <span className="text-gray-500 text-sm">No allergies recorded</span>
+                  <span className="text-gray-500 text-sm">{t('patient.no_allergies_recorded')}</span>
                 )}
               </div>
             </div>
@@ -471,7 +476,7 @@ const PatientDashboard: React.FC = () => {
         <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border p-6" style={{ willChange: 'transform' }}>
           <div className="flex items-center justify-between mb-4">
             <button className="flex items-center space-x-2" onClick={() => setRiskOpen(v => !v)} aria-expanded={riskOpen} aria-controls="risk-sec">
-              <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">Risk Factors</h3>
+              <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.risk_factors')}</h3>
               <ChevronRightIcon className={`h-5 w-5 text-gray-500 transition-transform ${riskOpen ? 'transform rotate-90' : ''}`} />
             </button>
             <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500" />
@@ -479,7 +484,7 @@ const PatientDashboard: React.FC = () => {
           <div id="risk-sec" className="space-y-3 transition-all duration-300" style={{ maxHeight: riskOpen ? '1000px' : '0', overflow: 'hidden' }}>
             {(healthMetrics?.riskFactors ?? []).length > 0 ? (
               (healthMetrics?.riskFactors ?? []).map((risk, index) => (
-                <div key={index} className="flex items-center space-x-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg transition-colors duration-150 hover:bg-yellow-100 dark:hover:bg-yellow-900/30">
+                <div key={`${risk}-${index}`} className="flex items-center space-x-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg transition-colors duration-150 hover:bg-yellow-100 dark:hover:bg-yellow-900/30">
                   <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500 flex-shrink-0" />
                   <span className="text-sm text-gray-700 dark:text-gray-300">{risk}</span>
                 </div>
@@ -487,7 +492,7 @@ const PatientDashboard: React.FC = () => {
             ) : (
               <div className="text-center py-4">
                 <ShieldCheckIcon className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                <p className="text-green-600 text-sm font-medium">No significant risk factors identified</p>
+                <p className="text-green-600 text-sm font-medium">{t('patient.no_risk_factors')}</p>
               </div>
             )}
           </div>

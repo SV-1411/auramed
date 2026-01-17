@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import { PanelLeftOpen, PanelLeftClose } from 'lucide-react';
+import { useI18n } from '../contexts/I18nContext';
 
 type NavbarProps = {
   isSidebarOpen: boolean;
@@ -12,6 +13,7 @@ type NavbarProps = {
 const Navbar: React.FC<NavbarProps> = ({ isSidebarOpen, onToggleSidebar }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { language, setLanguage, available, t } = useI18n();
 
   const handleLogout = async () => {
     await logout();
@@ -38,18 +40,30 @@ const Navbar: React.FC<NavbarProps> = ({ isSidebarOpen, onToggleSidebar }) => {
 
             {/* Auth buttons - Right */}
             <div className="flex items-center space-x-3 flex-shrink-0">
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as any)}
+                className="hidden sm:block rounded-xl border border-light-border dark:border-dark-border bg-white/70 dark:bg-dark-surface/70 px-3 py-2 text-sm text-light-text-primary dark:text-dark-text-primary"
+                aria-label={t('i18n.language')}
+              >
+                {available.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
               <ThemeToggle />
               <button
                 onClick={() => navigate('/login')}
                 className="text-light-text-secondary dark:text-dark-text-secondary hover:text-light-text-primary dark:hover:text-dark-text-primary hover:bg-matte-blue-100 dark:hover:bg-matte-blue-800 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200"
               >
-                Login
+                {t('auth.login')}
               </button>
               <button
                 onClick={() => navigate('/register')}
                 className="bg-gradient-to-r from-sapphire-600 to-sapphire-700 hover:from-sapphire-700 hover:to-sapphire-800 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
               >
-                Register
+                {t('auth.register')}
               </button>
             </div>
           </div>
@@ -89,6 +103,18 @@ const Navbar: React.FC<NavbarProps> = ({ isSidebarOpen, onToggleSidebar }) => {
           {/* User menu - Right */}
           <div className="flex items-center space-x-3 flex-shrink-0">
             <div className="hidden md:flex items-center space-x-3">
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as any)}
+                className="rounded-xl border border-light-border dark:border-dark-border bg-white/70 dark:bg-dark-surface/70 px-3 py-2 text-sm text-light-text-primary dark:text-dark-text-primary"
+                aria-label={t('i18n.language')}
+              >
+                {available.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
               <ThemeToggle />
               <div className="flex items-center space-x-2 text-sm text-light-text-secondary dark:text-dark-text-secondary bg-matte-blue-100/50 dark:bg-matte-blue-800/50 px-3 py-2 rounded-xl backdrop-blur-sm">
                 <div className="w-6 h-6 bg-gradient-to-br from-sapphire-500 to-sapphire-700 rounded-full flex items-center justify-center">
@@ -103,7 +129,7 @@ const Navbar: React.FC<NavbarProps> = ({ isSidebarOpen, onToggleSidebar }) => {
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
               >
-                <span>Logout</span>
+                <span>{t('auth.logout')}</span>
               </button>
             </div>
             <ThemeToggle />

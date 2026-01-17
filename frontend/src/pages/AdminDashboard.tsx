@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+import { useI18n } from '../contexts/I18nContext';
 import {
   UsersIcon,
   ShieldCheckIcon,
@@ -44,6 +45,7 @@ interface FraudAlert {
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { t, language } = useI18n();
   const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const [fraudAlerts, setFraudAlerts] = useState<FraudAlert[]>([]);
@@ -98,7 +100,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   if (loading) {
-    return <LoadingSpinner text="Loading admin dashboard..." />;
+    return <LoadingSpinner text={t('loading.admin_dashboard')} />;
   }
 
   const criticalAlerts = systemAlerts.filter(alert => alert.severity === 'critical' && !alert.isResolved);
@@ -109,10 +111,10 @@ const AdminDashboard: React.FC = () => {
       {/* Welcome Header */}
       <div className="bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg p-6 text-white">
         <h1 className="text-2xl font-bold mb-2">
-          Admin Dashboard - {user?.profile.firstName}
+          {t('admin.title', { name: user?.profile.firstName || '' })}
         </h1>
         <p className="text-purple-100">
-          Monitor platform health, manage users, and ensure system security.
+          {t('admin.subtitle')}
         </p>
       </div>
 
@@ -122,9 +124,12 @@ const AdminDashboard: React.FC = () => {
           <div className="flex items-center">
             <ExclamationTriangleIcon className="h-6 w-6 text-red-600 mr-3" />
             <div>
-              <h3 className="text-red-800 font-medium">Critical Alerts Require Attention</h3>
+              <h3 className="text-red-800 font-medium">{t('admin.critical_alerts_title')}</h3>
               <p className="text-red-700 text-sm">
-                {criticalAlerts.length} critical system alert{criticalAlerts.length > 1 ? 's' : ''} need immediate attention.
+                {t('admin.critical_alerts_subtitle', {
+                  count: criticalAlerts.length,
+                  plural: language === 'en' && criticalAlerts.length !== 1 ? 's' : ''
+                })}
               </p>
             </div>
           </div>
@@ -138,7 +143,7 @@ const AdminDashboard: React.FC = () => {
             <UsersIcon className="h-8 w-8 text-blue-600" />
             <div className="ml-4">
               <p className="text-2xl font-bold text-gray-900">{platformStats?.totalUsers || 0}</p>
-              <p className="text-sm text-gray-600">Total Users</p>
+              <p className="text-sm text-gray-600">{t('admin.total_users')}</p>
             </div>
           </div>
         </div>
@@ -148,7 +153,7 @@ const AdminDashboard: React.FC = () => {
             <ShieldCheckIcon className="h-8 w-8 text-green-600" />
             <div className="ml-4">
               <p className="text-2xl font-bold text-gray-900">{platformStats?.totalDoctors || 0}</p>
-              <p className="text-sm text-gray-600">Verified Doctors</p>
+              <p className="text-sm text-gray-600">{t('admin.verified_doctors')}</p>
             </div>
           </div>
         </div>
@@ -158,7 +163,7 @@ const AdminDashboard: React.FC = () => {
             <ClockIcon className="h-8 w-8 text-yellow-600" />
             <div className="ml-4">
               <p className="text-2xl font-bold text-gray-900">{platformStats?.pendingVerifications || 0}</p>
-              <p className="text-sm text-gray-600">Pending Verifications</p>
+              <p className="text-sm text-gray-600">{t('admin.pending_verifications')}</p>
             </div>
           </div>
         </div>
@@ -168,7 +173,7 @@ const AdminDashboard: React.FC = () => {
             <ChartBarIcon className="h-8 w-8 text-purple-600" />
             <div className="ml-4">
               <p className="text-2xl font-bold text-gray-900">{platformStats?.systemUptime?.toFixed(1) || '99.9'}%</p>
-              <p className="text-sm text-gray-600">System Uptime</p>
+              <p className="text-sm text-gray-600">{t('admin.system_uptime')}</p>
             </div>
           </div>
         </div>
@@ -179,9 +184,9 @@ const AdminDashboard: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border">
           <div className="p-6 border-b">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">System Alerts</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{t('admin.system_alerts')}</h2>
               <button className="text-sm text-blue-600 hover:text-blue-700">
-                View all
+                {t('admin.view_all')}
               </button>
             </div>
           </div>
@@ -190,8 +195,8 @@ const AdminDashboard: React.FC = () => {
             {systemAlerts.length === 0 ? (
               <div className="text-center py-8">
                 <CheckCircleIcon className="h-12 w-12 text-green-300 mx-auto mb-4" />
-                <p className="text-gray-500">All systems operational</p>
-                <p className="text-sm text-gray-400">No alerts at this time</p>
+                <p className="text-gray-500">{t('admin.all_systems_operational')}</p>
+                <p className="text-sm text-gray-400">{t('admin.no_alerts')}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -220,7 +225,7 @@ const AdminDashboard: React.FC = () => {
                           {alert.isResolved && (
                             <>
                               <span className="text-xs text-gray-400">•</span>
-                              <span className="text-xs text-green-600">Resolved</span>
+                              <span className="text-xs text-green-600">{t('admin.resolved')}</span>
                             </>
                           )}
                         </div>
@@ -237,9 +242,9 @@ const AdminDashboard: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border">
           <div className="p-6 border-b">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Fraud Detection</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{t('admin.fraud_detection')}</h2>
               <button className="text-sm text-blue-600 hover:text-blue-700">
-                View all
+                {t('admin.view_all')}
               </button>
             </div>
           </div>
@@ -248,8 +253,8 @@ const AdminDashboard: React.FC = () => {
             {fraudAlerts.length === 0 ? (
               <div className="text-center py-8">
                 <ShieldCheckIcon className="h-12 w-12 text-green-300 mx-auto mb-4" />
-                <p className="text-gray-500">No fraud alerts</p>
-                <p className="text-sm text-gray-400">System is secure</p>
+                <p className="text-gray-500">{t('admin.no_fraud_alerts')}</p>
+                <p className="text-sm text-gray-400">{t('admin.system_secure')}</p>
               </div>
             ) : (
               <div className="space-y-4">
