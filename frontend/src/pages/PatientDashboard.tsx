@@ -82,7 +82,7 @@ const PatientDashboard: React.FC = () => {
 
       setAppointments(appointmentsRes.data.data.appointments || []);
       setHealthInsights(insightsRes.data.data.insights || []);
-      setHealthMetrics(metricsRes.data.data?.metrics || {
+      setHealthMetrics(metricsRes.data.data || {
         healthScore: 85,
         bmi: 23.5,
         bloodPressure: '120/80',
@@ -102,7 +102,7 @@ const PatientDashboard: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'scheduled': return 'text-earthy-600 bg-earthy-50';
+      case 'scheduled': return 'text-blue-600 bg-blue-50';
       case 'in_progress': return 'text-green-600 bg-green-50';
       case 'completed': return 'text-gray-600 bg-gray-50';
       case 'cancelled': return 'text-red-600 bg-red-50';
@@ -124,28 +124,28 @@ const PatientDashboard: React.FC = () => {
     switch (severity?.toLowerCase()) {
       case 'critical': return <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />;
       case 'warning': return <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500" />;
-      default: return <InformationCircleIcon className="h-5 w-5 text-earthy-500" />;
+      default: return <InformationCircleIcon className="h-5 w-5 text-blue-500" />;
     }
   };
 
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto space-y-6 p-6">
-      <div className="bg-gradient-to-br from-earthy-700 via-earthy-800 to-earthy-900 rounded-2xl p-8 text-white shadow-2xl animate-pulse" />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="h-24 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg border border-earthy-100/50" />
-        <div className="h-24 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg border border-earthy-100/50" />
-        <div className="h-24 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg border border-earthy-100/50" />
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="h-64 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg border border-earthy-100/50" />
-        <div className="h-64 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg border border-earthy-100/50" />
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="h-64 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg border border-earthy-100/50" />
-        <div className="h-64 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg border border-earthy-100/50" />
-        <div className="h-64 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg border border-earthy-100/50" />
-      </div>
+        <div className="bg-gradient-to-br from-sapphire-600 via-sapphire-700 to-sapphire-800 rounded-2xl p-8 text-white shadow-2xl animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="h-24 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg" />
+          <div className="h-24 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg" />
+          <div className="h-24 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-64 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg" />
+          <div className="h-64 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="h-64 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg" />
+          <div className="h-64 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg" />
+          <div className="h-64 bg-white/60 dark:bg-dark-card/60 rounded-2xl shadow-lg" />
+        </div>
       </div>
     );
   }
@@ -153,109 +153,109 @@ const PatientDashboard: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-6 p-6">
       {/* Welcome Header */}
-    <div className="bg-gradient-to-br from-earthy-700 via-earthy-800 to-earthy-900 dark:from-earthy-800 dark:via-earthy-900 dark:to-black rounded-2xl p-8 text-white shadow-2xl relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
-      <div className="relative z-10">
-        <h1 className="text-4xl font-bold mb-3 tracking-tight">
-          {t('patient.welcome', { name: user?.profile.firstName || '' })}
-        </h1>
-        <p className="text-earthy-100 text-lg opacity-90">
-          {t('patient.subtitle')}
-        </p>
+      <div className="bg-gradient-to-br from-sapphire-600 via-sapphire-700 to-sapphire-800 dark:from-sapphire-700 dark:via-sapphire-800 dark:to-sapphire-900 rounded-2xl p-8 text-white shadow-2xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
+        <div className="relative z-10">
+          <h1 className="text-4xl font-bold mb-3 tracking-tight">
+            {t('patient.welcome', { name: user?.profile.firstName || '' })}
+          </h1>
+          <p className="text-sapphire-100 text-lg opacity-90">
+            {t('patient.subtitle')}
+          </p>
+        </div>
       </div>
-    </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <Link
-        to="/ai-chat"
-        className="group relative bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-light-border dark:border-dark-border hover:shadow-2xl hover:border-earthy-300 dark:hover:border-earthy-600 transition-all duration-300 overflow-hidden"
-        style={{ willChange: 'transform' }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-earthy-50/50 to-transparent dark:from-earthy-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        <div className="relative z-10 flex items-center space-x-4">
-          <div className="p-3 bg-gradient-to-br from-earthy-500 to-earthy-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
-            <ChatBubbleLeftRightIcon className="h-6 w-6 text-white" />
+        <Link
+          to="/ai-chat"
+          className="group relative bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-light-border dark:border-dark-border hover:shadow-2xl hover:border-sapphire-300 dark:hover:border-sapphire-600 transition-all duration-300 overflow-hidden"
+          style={{ willChange: 'transform' }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-sapphire-50/50 to-transparent dark:from-sapphire-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <div className="relative z-10 flex items-center space-x-4">
+            <div className="p-3 bg-gradient-to-br from-sapphire-500 to-sapphire-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
+              <ChatBubbleLeftRightIcon className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-sapphire-700 dark:group-hover:text-sapphire-300 transition-colors">{t('patient.quick.ai_chat')}</h3>
+              <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{t('patient.quick.ai_chat_sub')}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-earthy-700 dark:group-hover:text-earthy-300 transition-colors">{t('patient.quick.ai_chat')}</h3>
-            <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{t('patient.quick.ai_chat_sub')}</p>
-          </div>
-        </div>
-      </Link>
+        </Link>
 
-      <Link
-        to="/appointments"
-        className="group relative bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-light-border dark:border-dark-border hover:shadow-2xl hover:border-earthy-300 dark:hover:border-earthy-600 transition-all duration-300 overflow-hidden"
-        style={{ willChange: 'transform' }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-earthy-50/50 to-transparent dark:from-earthy-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        <div className="relative z-10 flex items-center space-x-4">
-          <div className="p-3 bg-gradient-to-br from-earthy-500 to-earthy-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
-            <CalendarDaysIcon className="h-6 w-6 text-white" />
+        <Link
+          to="/appointments"
+          className="group relative bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-light-border dark:border-dark-border hover:shadow-2xl hover:border-sapphire-300 dark:hover:border-sapphire-600 transition-all duration-300 overflow-hidden"
+          style={{ willChange: 'transform' }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-sapphire-50/50 to-transparent dark:from-sapphire-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <div className="relative z-10 flex items-center space-x-4">
+            <div className="p-3 bg-gradient-to-br from-sapphire-500 to-sapphire-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
+              <CalendarDaysIcon className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-sapphire-700 dark:group-hover:text-sapphire-300 transition-colors">{t('patient.quick.book_appointment')}</h3>
+              <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{t('patient.quick.book_appointment_sub')}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-earthy-700 dark:group-hover:text-earthy-300 transition-colors">{t('patient.quick.book_appointment')}</h3>
-            <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{t('patient.quick.book_appointment_sub')}</p>
-          </div>
-        </div>
-      </Link>
+        </Link>
 
-      <button
-        onClick={() => navigate('/sos')}
-        className="group relative bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-light-border dark:border-dark-border hover:shadow-2xl hover:border-earthy-300 dark:hover:border-earthy-600 transition-all duration-300 overflow-hidden"
-        style={{ willChange: 'transform' }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-earthy-50/50 to-transparent dark:from-earthy-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        <div className="relative z-10 flex items-center space-x-4">
-          <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
-            <PlusIcon className="h-6 w-6 text-white" />
+        <button
+          onClick={() => navigate('/sos')}
+          className="group relative bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-light-border dark:border-dark-border hover:shadow-2xl hover:border-sapphire-300 dark:hover:border-sapphire-600 transition-all duration-300 overflow-hidden"
+          style={{ willChange: 'transform' }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-sapphire-50/50 to-transparent dark:from-sapphire-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <div className="relative z-10 flex items-center space-x-4">
+            <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
+              <PlusIcon className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-red-700 dark:group-hover:text-red-300 transition-colors">{t('patient.quick.emergency')}</h3>
+              <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{t('patient.quick.emergency_sub')}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-bold text-light-text-primary dark:text-dark-text-primary group-hover:text-red-700 dark:group-hover:text-red-300 transition-colors">{t('patient.quick.emergency')}</h3>
-            <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">{t('patient.quick.emergency_sub')}</p>
-          </div>
-        </div>
-      </button>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Appointments */}
-    <div className="group bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl focus-within:ring-2 focus-within:ring-earthy-400" style={{ willChange: 'transform' }}>
-      <div className="p-6 border-b border-light-border dark:border-dark-border">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.recent_appointments')}</h2>
-          <Link
-            to="/appointments"
-            className="text-sm text-earthy-600 dark:text-earthy-400 hover:text-earthy-700 dark:hover:text-earthy-300 font-semibold transition-colors"
-          >
-            {t('common.view_all')}
-          </Link>
-        </div>
-      </div>
+        <div className="group bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl focus-within:ring-2 focus-within:ring-sapphire-400" style={{ willChange: 'transform' }}>
+          <div className="p-6 border-b border-light-border dark:border-dark-border">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.recent_appointments')}</h2>
+              <Link
+                to="/appointments"
+                className="text-sm text-sapphire-600 dark:text-sapphire-400 hover:text-sapphire-700 dark:hover:text-sapphire-300 font-semibold transition-colors"
+              >
+                {t('common.view_all')}
+              </Link>
+            </div>
+          </div>
           
           <div className="p-6">
             {appointments.length === 0 ? (
               <div className="text-center py-8">
                 <CalendarDaysIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500">{t('patient.no_appointments')}</p>
-            <Link
-              to="/appointments"
-              className="text-earthy-600 dark:text-earthy-400 hover:text-earthy-700 dark:hover:text-earthy-300 text-sm font-semibold transition-colors"
-            >
-              {t('patient.book_first')}
-            </Link>
+                <Link
+                  to="/appointments"
+                  className="text-sapphire-600 dark:text-sapphire-400 hover:text-sapphire-700 dark:hover:text-sapphire-300 text-sm font-semibold transition-colors"
+                >
+                  {t('patient.book_first')}
+                </Link>
               </div>
             ) : (
               <div className="space-y-4" role="list" aria-label="Recent appointments list">
-                {appointments.map((appointment) => (
-                  <div key={appointment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-800/60" role="listitem">
+                {appointments.map((appointment, index) => (
+                  <div key={appointment.id || `app-${index}`} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-800/60" role="listitem">
                     <div className="flex items-center space-x-3">
                       <div className="flex-shrink-0">
                         {appointment.status === 'completed' ? (
                           <CheckCircleIcon className="h-6 w-6 text-green-500" />
                         ) : (
-                          <ClockIcon className="h-6 w-6 text-earthy-500" />
+                          <ClockIcon className="h-6 w-6 text-blue-500" />
                         )}
                       </div>
                       <div>
@@ -289,15 +289,15 @@ const PatientDashboard: React.FC = () => {
         </div>
 
         {/* Health Insights */}
-      <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border" aria-live="polite">
-        <div className="p-6 border-b border-light-border dark:border-dark-border">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.health_insights')}</h2>
-            <button className="text-sm text-earthy-600 dark:text-earthy-400 hover:text-earthy-700 dark:hover:text-earthy-300 font-semibold transition-colors">
-              {t('common.view_all')}
-            </button>
+        <div className="bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border" aria-live="polite">
+          <div className="p-6 border-b border-light-border dark:border-dark-border">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.health_insights')}</h2>
+              <button className="text-sm text-sapphire-600 dark:text-sapphire-400 hover:text-sapphire-700 dark:hover:text-sapphire-300 font-semibold transition-colors">
+                {t('common.view_all')}
+              </button>
+            </div>
           </div>
-        </div>
           
           <div className="p-6">
             {healthInsights.length === 0 ? (
@@ -308,28 +308,28 @@ const PatientDashboard: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4" role="list" aria-label="Health insights list">
-                {healthInsights.map((insight) => (
-                  <div key={insight.id} role="listitem" className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-800/60 focus-within:ring-2 focus-within:ring-earthy-400">
+                {healthInsights.map((insight, index) => (
+                  <div key={insight.id || `insight-${index}`} role="listitem" className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-800/60 focus-within:ring-2 focus-within:ring-sapphire-400">
                     <button className="flex-1 text-left flex items-start space-x-3 group" onClick={() => markInsightRead(insight.id)} aria-label={`Open insight ${insight.title}`}>
                       <div className="flex-shrink-0">
                         {getSeverityIcon(insight.severity)}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-start justify-between">
-                          <h4 className="font-medium text-gray-900 group-hover:text-earthy-700 dark:group-hover:text-earthy-300 transition-colors">{insight.title}</h4>
+                          <h4 className="font-medium text-gray-900 group-hover:text-sapphire-700 dark:group-hover:text-sapphire-300 transition-colors">{insight.title}</h4>
                           <ChevronRightIcon className="h-5 w-5 text-gray-400" />
                         </div>
                         <p className="text-sm text-gray-600 mt-1">{insight.description}</p>
                         <div className="flex items-center space-x-2 mt-2">
                           <span className="text-xs text-gray-500 capitalize">{insight.type}</span>
                           {!insight.isRead && (
-                            <span className="w-2 h-2 bg-earthy-500 rounded-full" title={t('common.unread')}></span>
+                            <span className="w-2 h-2 bg-blue-500 rounded-full" title={t('common.unread')}></span>
                           )}
                         </div>
                       </div>
                     </button>
                     {!insight.isRead && (
-                      <button onClick={() => markInsightRead(insight.id)} className="text-xs text-earthy-600 hover:text-earthy-700 dark:text-earthy-400 dark:hover:text-earthy-300 font-semibold">
+                      <button onClick={() => markInsightRead(insight.id)} className="text-xs text-sapphire-600 hover:text-sapphire-700 dark:text-sapphire-400 dark:hover:text-sapphire-300 font-semibold">
                         {t('common.mark_as_read')}
                       </button>
                     )}
@@ -378,7 +378,7 @@ const PatientDashboard: React.FC = () => {
         <div className="group bg-white/80 dark:bg-dark-card/80 backdrop-blur-sm rounded-2xl shadow-lg border border-light-border dark:border-dark-border p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl" style={{ willChange: 'transform' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-light-text-primary dark:text-dark-text-primary">{t('patient.vital_signs')}</h3>
-            <ChartBarIcon className="h-6 w-6 text-earthy-500" />
+            <ChartBarIcon className="h-6 w-6 text-blue-500" />
           </div>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -387,7 +387,7 @@ const PatientDashboard: React.FC = () => {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-400">{t('patient.heart_rate')}</span>
-              <span className="font-semibold text-earthy-600" title="Beats per minute">{healthMetrics?.heartRate || 0} {t('common.bpm')}</span>
+              <span className="font-semibold text-blue-600" title="Beats per minute">{healthMetrics?.heartRate || 0} {t('common.bpm')}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600 dark:text-gray-400">{t('patient.bmi')}</span>
@@ -413,9 +413,9 @@ const PatientDashboard: React.FC = () => {
               <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300" title="Completed visits">{appointments.filter(a => a.status === 'completed').length}</div>
               <div className="text-xs text-emerald-600 dark:text-emerald-400">{t('patient.visits')}</div>
             </div>
-            <div className="text-center p-3 bg-gradient-to-br from-earthy-50 to-earthy-100 dark:from-earthy-900/30 dark:to-earthy-800/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
-              <div className="text-2xl font-bold text-earthy-700 dark:text-earthy-300" title="Upcoming appointments">{appointments.filter(a => a.status === 'scheduled').length}</div>
-              <div className="text-xs text-earthy-600 dark:text-earthy-400">{t('patient.upcoming')}</div>
+            <div className="text-center p-3 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300" title="Upcoming appointments">{appointments.filter(a => a.status === 'scheduled').length}</div>
+              <div className="text-xs text-blue-600 dark:text-blue-400">{t('patient.upcoming')}</div>
             </div>
             <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
               <div className="text-2xl font-bold text-purple-700 dark:text-purple-300" title="Current medications">{healthMetrics?.medications?.length || 0}</div>
