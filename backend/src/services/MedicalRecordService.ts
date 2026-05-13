@@ -1,11 +1,10 @@
-import { PrismaClient, MedicalRecord, UserRole, RiskLevel } from '@prisma/client';
+import { MedicalRecord, UserRole, RiskLevel } from '@prisma/client';
 import { logger } from '../utils/logger';
+import { getDatabase } from '../config/database';
 
 export class MedicalRecordService {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = new PrismaClient();
+  private get db() {
+    return getDatabase();
   }
 
   async createMedicalRecord(data: {
@@ -22,7 +21,7 @@ export class MedicalRecordService {
     followUpDate?: Date | null;
   }): Promise<MedicalRecord> {
     try {
-      return await this.prisma.medicalRecord.create({
+      return await this.db.medicalRecord.create({
         data: {
           patientId: data.patientId,
           doctorId: data.doctorId,
@@ -45,7 +44,7 @@ export class MedicalRecordService {
 
   async getMedicalRecordById(recordId: string): Promise<MedicalRecord | null> {
     try {
-      return await this.prisma.medicalRecord.findUnique({
+      return await this.db.medicalRecord.findUnique({
         where: { id: recordId },
         include: {
           patient: true,
@@ -60,7 +59,7 @@ export class MedicalRecordService {
 
   async getPatientMedicalHistory(patientId: string): Promise<MedicalRecord[]> {
     try {
-      return await this.prisma.medicalRecord.findMany({
+      return await this.db.medicalRecord.findMany({
         where: { patientId },
         include: {
           doctor: { include: { doctorProfile: true } }
@@ -75,7 +74,7 @@ export class MedicalRecordService {
 
   async getDoctorMedicalRecords(doctorId: string): Promise<MedicalRecord[]> {
     try {
-      return await this.prisma.medicalRecord.findMany({
+      return await this.db.medicalRecord.findMany({
         where: { doctorId },
         include: {
           patient: { include: { patientProfile: true } }
@@ -90,7 +89,7 @@ export class MedicalRecordService {
 
   async updateMedicalRecord(recordId: string, updateData: Partial<MedicalRecord>): Promise<MedicalRecord> {
     try {
-      return await this.prisma.medicalRecord.update({
+      return await this.db.medicalRecord.update({
         where: { id: recordId },
         data: {
           ...updateData
@@ -128,7 +127,7 @@ export class MedicalRecordService {
         if (searchParams.dateTo) where.date.lte = searchParams.dateTo;
       }
 
-      return await this.prisma.medicalRecord.findMany({
+      return await this.db.medicalRecord.findMany({
         where,
         include: {
           patient: { include: { patientProfile: true } },
@@ -161,7 +160,7 @@ export class MedicalRecordService {
         };
       }
 
-      const records = await this.prisma.medicalRecord.findMany({
+      const records = await this.db.medicalRecord.findMany({
         where,
         orderBy: { date: 'desc' }
       });
@@ -225,7 +224,7 @@ export class MedicalRecordService {
 
   async deleteMedicalRecord(recordId: string): Promise<void> {
     try {
-      await this.prisma.medicalRecord.delete({
+      await this.db.medicalRecord.delete({
         where: { id: recordId }
       });
       logger.info(`Medical record ${recordId} deleted`);
@@ -237,7 +236,7 @@ export class MedicalRecordService {
 
   async validateRecordAccess(recordId: string, userId: string, userRole: UserRole): Promise<boolean> {
     try {
-      const record = await this.prisma.medicalRecord.findUnique({
+      const record = await this.db.medicalRecord.findUnique({
         where: { id: recordId },
         include: {
           patient: true,

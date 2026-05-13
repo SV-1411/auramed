@@ -1,4 +1,5 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { UserRole } from '@prisma/client';
+import { getDatabase } from '../config/database';
 import { logger } from '../utils/logger';
 
 export interface ComplianceViolation {
@@ -18,10 +19,8 @@ export interface DataRetentionViolation {
 }
 
 export class ComplianceService {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = new PrismaClient();
+  private get db() {
+    return getDatabase();
   }
 
   async checkHIPAACompliance(): Promise<ComplianceViolation[]> {
@@ -99,7 +98,7 @@ export class ComplianceService {
       };
 
       // Check medical records retention
-      const oldMedicalRecords = await this.prisma.medicalRecord.findMany({
+      const oldMedicalRecords = await this.db.medicalRecord.findMany({
         where: {
           date: {
             lt: new Date(currentDate.getTime() - retentionPolicies.medical_records * 24 * 60 * 60 * 1000)
@@ -119,7 +118,7 @@ export class ComplianceService {
       }
 
       // Check appointments retention
-      const oldAppointments = await this.prisma.appointment.findMany({
+      const oldAppointments = await this.db.appointment.findMany({
         where: {
           createdAt: {
             lt: new Date(currentDate.getTime() - retentionPolicies.appointments * 24 * 60 * 60 * 1000)
@@ -139,7 +138,7 @@ export class ComplianceService {
       }
 
       // Check audit logs retention
-      const oldAuditLogs = await this.prisma.auditLog.findMany({
+      const oldAuditLogs = await this.db.auditLog.findMany({
         where: {
           createdAt: {
             lt: new Date(currentDate.getTime() - retentionPolicies.audit_logs * 24 * 60 * 60 * 1000)
@@ -172,7 +171,7 @@ export class ComplianceService {
 
       // Check for users without explicit consent
       // Mock: select active patients and simulate missing consent based on heuristic
-      const activePatients = await this.prisma.user.findMany({
+      const activePatients = await this.db.user.findMany({
         where: { role: UserRole.PATIENT, isActive: true },
         take: 5
       });
@@ -223,7 +222,7 @@ export class ComplianceService {
 
   private async findUnencryptedMedicalRecords(): Promise<any[]> {
     // Mock implementation - in production, check for actual encryption status
-    return await this.prisma.medicalRecord.findMany({
+    return await this.db.medicalRecord.findMany({
       where: {
         // Simulate finding records that should be encrypted but aren't
         diagnosis: { contains: 'UNENCRYPTED' }
@@ -234,7 +233,7 @@ export class ComplianceService {
 
   private async detectUnauthorizedAccess(): Promise<any[]> {
     // Mock implementation - check audit logs for suspicious access patterns
-    const suspiciousLogs = await this.prisma.auditLog.findMany({
+    const suspiciousLogs = await this.db.auditLog.findMany({
       where: {
         action: 'DATA_ACCESS',
         createdAt: {
@@ -253,7 +252,7 @@ export class ComplianceService {
 
   private async findMissingPatientConsent(): Promise<any[]> {
     // Find patients without proper consent documentation
-    return await this.prisma.user.findMany({
+    return await this.db.user.findMany({
       where: {
         role: UserRole.PATIENT,
         createdAt: {
@@ -267,7 +266,7 @@ export class ComplianceService {
 
   private async detectDataSharingViolations(): Promise<any[]> {
     // Mock implementation - detect unauthorized data sharing
-    const logs = await this.prisma.auditLog.findMany({
+    const logs = await this.db.auditLog.findMany({
       where: {
         action: 'DATA_EXPORT'
       },
@@ -282,7 +281,7 @@ export class ComplianceService {
 
   private async detectUnauthorizedDataProcessing(): Promise<any[]> {
     // Mock implementation - find data processing without proper authorization
-    const logs = await this.prisma.auditLog.findMany({
+    const logs = await this.db.auditLog.findMany({
       where: {
         action: 'DATA_PROCESSING'
       },
@@ -299,7 +298,7 @@ export class ComplianceService {
     // Mock implementation - find overdue data subject requests
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     
-    return await this.prisma.auditLog.findMany({
+    return await this.db.auditLog.findMany({
       where: {
         action: 'DATA_SUBJECT_REQUEST',
         createdAt: { lt: thirtyDaysAgo }

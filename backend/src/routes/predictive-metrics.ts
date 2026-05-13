@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
 import { calculateHealthScore } from './predictive-insights';
+import { createError } from '../middleware/errorHandler';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -11,7 +12,9 @@ const prisma = new PrismaClient();
 router.get('/', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req as any).user?.id || (req as any).user?.userId; // support both shapes
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!userId) {
+      throw createError('Unauthorized', 401);
+    }
 
     // Get user data for metrics calculation (mirror of predictive-insights /metrics)
     const [medicalRecords, appointments, patientProfile] = await Promise.all([
@@ -81,10 +84,12 @@ router.get('/', authenticateToken, async (req: Request, res: Response, next: Nex
       }
     ];
 
-    res.json({ success: true, data: { metrics } });
+    res.json({
+      status: 'success',
+      data: { metrics }
+    });
   } catch (error) {
-    logger.error('Predictive metrics (compat) error:', error as Error);
-    res.status(500).json({ error: 'Failed to get predictive metrics' });
+    next(error);
   }
 });
 

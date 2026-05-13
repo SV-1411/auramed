@@ -1,7 +1,6 @@
-import { PrismaClient, AppointmentStatus, InsightType, Severity, Gender } from '@prisma/client';
+import { AppointmentStatus, InsightType, Severity, Gender } from '@prisma/client';
 import { logger } from '../utils/logger';
-
-const prisma = new PrismaClient();
+import { getDatabase } from '../config/database';
 
 export interface HealthMetric {
   type: 'blood_pressure' | 'heart_rate' | 'weight' | 'blood_sugar' | 'temperature' | 'bmi';
@@ -39,12 +38,16 @@ export interface PredictiveAnalysis {
 }
 
 export class HealthInsightsService {
+  private get db() {
+    return getDatabase();
+  }
+
   /**
    * Generate health insights for a patient based on their medical history
    */
   async generateHealthInsights(patientId: string): Promise<HealthInsight[]> {
     try {
-      const patient = await prisma.user.findUnique({
+      const patient = await this.db.user.findUnique({
         where: { id: patientId },
         include: {
           patientProfile: true,
@@ -80,7 +83,7 @@ export class HealthInsightsService {
 
       // Persist insights – let Prisma generate ObjectIds to avoid invalid id errors
       for (const insight of insights) {
-        await prisma.healthInsight.create({
+        await this.db.healthInsight.create({
           data: {
             patientId: insight.patientId,
             type: this.mapInsightType(insight.type),
@@ -294,7 +297,7 @@ export class HealthInsightsService {
    */
   async generatePredictiveAnalysis(patientId: string): Promise<PredictiveAnalysis> {
     try {
-      const patient = await prisma.user.findUnique({
+      const patient = await this.db.user.findUnique({
         where: { id: patientId },
         include: {
           patientProfile: { include: { familyMembers: true } },
@@ -338,7 +341,7 @@ export class HealthInsightsService {
   }
 
   /**
-   * Extract chronic conditions from medical records
+   * Analyze chronic conditions from medical records
    */
   private extractChronicConditions(medicalRecords: any[]): string[] {
     const conditions: string[] = [];
@@ -521,3 +524,4 @@ export class HealthInsightsService {
 }
 
 export const healthInsightsService = new HealthInsightsService();
+;

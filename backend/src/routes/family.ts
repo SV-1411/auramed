@@ -1,13 +1,14 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { PrismaClient, AppointmentType, RiskLevel } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
+import { createError } from '../middleware/errorHandler';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
 // Add family member with comprehensive profile
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
       firstName,
@@ -22,11 +23,11 @@ router.post('/', authenticateToken, async (req, res) => {
       currentMedications
     } = req.body;
 
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = (req as any).user?.userId;
+    if (!userId) throw createError('Unauthorized', 401);
 
     if (!firstName || !lastName || !relationship) {
-      return res.status(400).json({ error: 'firstName, lastName, and relationship are required' });
+      throw createError('firstName, lastName, and relationship are required', 400);
     }
 
     let patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
@@ -63,22 +64,21 @@ router.post('/', authenticateToken, async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: { familyMember },
       message: 'Family member added successfully'
     });
 
   } catch (error) {
-    logger.error('Failed to add family member:', error);
-    res.status(500).json({ error: 'Failed to add family member' });
+    next(error);
   }
 });
 
 // Get all family members with comprehensive data
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = (req as any).user?.userId;
+    if (!userId) throw createError('Unauthorized', 401);
 
     let patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
     if (!patientProfile) {
@@ -105,28 +105,27 @@ router.get('/', authenticateToken, async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: { familyMembers },
       count: familyMembers.length
     });
 
   } catch (error) {
-    logger.error('Failed to get family members:', error);
-    res.status(500).json({ error: 'Failed to get family members' });
+    next(error);
   }
 });
 
 // Update family member with comprehensive data
-router.put('/:memberId', authenticateToken, async (req, res) => {
+router.put('/:memberId', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { memberId } = req.params;
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const updateData = req.body;
 
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!userId) throw createError('Unauthorized', 401);
 
     const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
-    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
+    if (!patientProfile) throw createError('Patient profile not found', 400);
 
     const familyMember = await prisma.familyMember.findFirst({
       where: {
@@ -137,7 +136,7 @@ router.put('/:memberId', authenticateToken, async (req, res) => {
     });
 
     if (!familyMember) {
-      return res.status(404).json({ error: 'Family member not found' });
+      throw createError('Family member not found', 404);
     }
 
     const updatedMember = await prisma.familyMember.update({
@@ -157,27 +156,26 @@ router.put('/:memberId', authenticateToken, async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: { familyMember: updatedMember },
       message: 'Family member updated successfully'
     });
 
   } catch (error) {
-    logger.error('Failed to update family member:', error);
-    res.status(500).json({ error: 'Failed to update family member' });
+    next(error);
   }
 });
 
 // Delete family member (soft delete)
-router.delete('/:memberId', authenticateToken, async (req, res) => {
+router.delete('/:memberId', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { memberId } = req.params;
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
 
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!userId) throw createError('Unauthorized', 401);
 
     const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
-    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
+    if (!patientProfile) throw createError('Patient profile not found', 400);
 
     const familyMember = await prisma.familyMember.findFirst({
       where: {
@@ -188,7 +186,7 @@ router.delete('/:memberId', authenticateToken, async (req, res) => {
     });
 
     if (!familyMember) {
-      return res.status(404).json({ error: 'Family member not found' });
+      throw createError('Family member not found', 404);
     }
 
     // Soft delete - mark as inactive
@@ -198,24 +196,23 @@ router.delete('/:memberId', authenticateToken, async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: 'success',
       message: 'Family member removed successfully'
     });
 
   } catch (error) {
-    logger.error('Failed to delete family member:', error);
-    res.status(500).json({ error: 'Failed to remove family member' });
+    next(error);
   }
 });
 
 // Get family member statistics
-router.get('/stats', authenticateToken, async (req, res) => {
+router.get('/stats', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = (req as any).user?.userId;
+    if (!userId) throw createError('Unauthorized', 401);
 
     const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
-    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
+    if (!patientProfile) throw createError('Patient profile not found', 400);
 
     const familyMembers = await prisma.familyMember.findMany({
       where: {
@@ -236,18 +233,17 @@ router.get('/stats', authenticateToken, async (req, res) => {
     };
 
     res.json({
-      success: true,
+      status: 'success',
       data: { stats }
     });
 
   } catch (error) {
-    logger.error('Failed to get family stats:', error);
-    res.status(500).json({ error: 'Failed to get family statistics' });
+    next(error);
   }
 });
 
 // Book appointment for family member
-router.post('/:memberId/appointment', authenticateToken, async (req, res) => {
+router.post('/:memberId/appointment', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { memberId } = req.params;
     const {
@@ -259,11 +255,11 @@ router.post('/:memberId/appointment', authenticateToken, async (req, res) => {
       duration = 30
     } = req.body;
 
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = (req as any).user?.userId;
+    if (!userId) throw createError('Unauthorized', 401);
 
     const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
-    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
+    if (!patientProfile) throw createError('Patient profile not found', 400);
 
     const familyMember = await prisma.familyMember.findFirst({
       where: {
@@ -274,7 +270,7 @@ router.post('/:memberId/appointment', authenticateToken, async (req, res) => {
     });
 
     if (!familyMember) {
-      return res.status(404).json({ error: 'Family member not found' });
+      throw createError('Family member not found', 404);
     }
 
     const appointment = await prisma.appointment.create({
@@ -294,27 +290,26 @@ router.post('/:memberId/appointment', authenticateToken, async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: { appointment },
       message: `Appointment booked for ${familyMember.firstName} ${familyMember.lastName}`
     });
 
   } catch (error) {
-    logger.error('Failed to book family appointment:', error);
-    res.status(500).json({ error: 'Failed to book appointment for family member' });
+    next(error);
   }
 });
 
 // Get family member medical history
-router.get('/:memberId/medical-history', authenticateToken, async (req, res) => {
+router.get('/:memberId/medical-history', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { memberId } = req.params;
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
 
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!userId) throw createError('Unauthorized', 401);
 
     const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } });
-    if (!patientProfile) return res.status(400).json({ error: 'Patient profile not found' });
+    if (!patientProfile) throw createError('Patient profile not found', 400);
 
     const familyMember = await prisma.familyMember.findFirst({
       where: {
@@ -325,11 +320,11 @@ router.get('/:memberId/medical-history', authenticateToken, async (req, res) => 
     });
 
     if (!familyMember) {
-      return res.status(404).json({ error: 'Family member not found' });
+      throw createError('Family member not found', 404);
     }
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         familyMember: {
           id: familyMember.id,
@@ -342,8 +337,7 @@ router.get('/:memberId/medical-history', authenticateToken, async (req, res) => 
     });
 
   } catch (error) {
-    logger.error('Failed to get family medical history:', error);
-    res.status(500).json({ error: 'Failed to get medical history' });
+    next(error);
   }
 });
 

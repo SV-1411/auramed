@@ -1,17 +1,18 @@
-import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import express, { Request, Response, NextFunction } from 'express';
 import { authenticateToken, requireRole } from '../middleware/auth';
 import { logger } from '../utils/logger';
+import { createError } from '../middleware/errorHandler';
+import { getDatabase } from '../config/database';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get doctor profile
-router.get('/profile', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
+router.get('/profile', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
+    const db = getDatabase();
 
-    const doctor = await prisma.user.findUnique({
+    const doctor = await db.user.findUnique({
       where: { id: userId },
       include: {
         doctorProfile: {
@@ -23,24 +24,23 @@ router.get('/profile', authenticateToken, requireRole('DOCTOR'), async (req: Req
     });
 
     if (!doctor) {
-      return res.status(404).json({ error: 'Doctor not found' });
+      throw createError('Doctor not found', 404);
     }
 
     res.json({
-      success: true,
+      status: 'success',
       data: doctor
     });
 
   } catch (error) {
-    logger.error('Failed to get doctor profile:', error);
-    res.status(500).json({ error: 'Failed to get doctor profile' });
+    next(error);
   }
 });
 
 // Update doctor profile
-router.put('/profile', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
+router.put('/profile', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const { firstName, lastName, specialization, licenseNumber, experience, consultationFee } = req.body as {
       firstName?: string;
       lastName?: string;
@@ -49,8 +49,9 @@ router.put('/profile', authenticateToken, requireRole('DOCTOR'), async (req: Req
       experience?: string;
       consultationFee?: string;
     };
+    const db = getDatabase();
 
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await db.user.update({
       where: { id: userId },
       data: {
         doctorProfile: {
@@ -81,21 +82,21 @@ router.put('/profile', authenticateToken, requireRole('DOCTOR'), async (req: Req
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: updatedUser
     });
 
   } catch (error) {
-    logger.error('Failed to update doctor profile:', error);
-    res.status(500).json({ error: 'Failed to update doctor profile' });
+    next(error);
   }
 });
 
 // Get doctor appointments
-router.get('/appointments', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
+router.get('/appointments', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
-    const { status, date, limit = 10, offset = 0 } = req.query;
+    const userId = (req as any).user?.userId;
+    const { status, date, limit = '10', offset = '0' } = req.query;
+    const db = getDatabase();
 
     const whereClause: any = { doctorId: userId };
     if (status) {
@@ -111,7 +112,7 @@ router.get('/appointments', authenticateToken, requireRole('DOCTOR'), async (req
       };
     }
 
-    const appointments = await prisma.appointment.findMany({
+    const appointments = await db.appointment.findMany({
       where: whereClause,
       include: {
         patient: {
@@ -125,12 +126,12 @@ router.get('/appointments', authenticateToken, requireRole('DOCTOR'), async (req
       skip: parseInt(offset as string)
     });
 
-    const total = await prisma.appointment.count({
+    const total = await db.appointment.count({
       where: whereClause
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         appointments,
         total,
@@ -140,16 +141,16 @@ router.get('/appointments', authenticateToken, requireRole('DOCTOR'), async (req
     });
 
   } catch (error) {
-    logger.error('Failed to get doctor appointments:', error);
-    res.status(500).json({ error: 'Failed to get doctor appointments' });
+    next(error);
   }
 });
 
 // Get availability slots
-router.get('/availability', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
+router.get('/availability', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const { date } = req.query;
+    const db = getDatabase();
 
     let whereClause: any = { doctorId: userId };
     if (date) {
@@ -162,29 +163,29 @@ router.get('/availability', authenticateToken, requireRole('DOCTOR'), async (req
       };
     }
 
-    const availabilitySlots = await prisma.availabilitySlot.findMany({
+    const availabilitySlots = await db.availabilitySlot.findMany({
       where: whereClause,
       orderBy: { startTime: 'asc' }
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: availabilitySlots
     });
 
   } catch (error) {
-    logger.error('Failed to get availability slots:', error);
-    res.status(500).json({ error: 'Failed to get availability slots' });
+    next(error);
   }
 });
 
 // Create availability slot
-router.post('/availability', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
+router.post('/availability', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const { startTime, endTime, dayOfWeek, isAvailable } = req.body;
+    const db = getDatabase();
 
-    const availabilitySlot = await prisma.availabilitySlot.create({
+    const availabilitySlot = await db.availabilitySlot.create({
       data: {
         doctorId: userId!,
         dayOfWeek,
@@ -195,20 +196,19 @@ router.post('/availability', authenticateToken, requireRole('DOCTOR'), async (re
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: availabilitySlot
     });
 
   } catch (error) {
-    logger.error('Failed to create availability slot:', error);
-    res.status(500).json({ error: 'Failed to create availability slot' });
+    next(error);
   }
 });
 
 // Update availability slot
-router.put('/availability/:slotId', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
+router.put('/availability/:slotId', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const { slotId } = req.params;
     const { dayOfWeek, startTime, endTime, isAvailable } = req.body as {
       dayOfWeek?: number;
@@ -216,9 +216,10 @@ router.put('/availability/:slotId', authenticateToken, requireRole('DOCTOR'), as
       endTime?: string;
       isAvailable?: boolean;
     };
+    const db = getDatabase();
 
     // Verify slot belongs to doctor
-    const existingSlot = await prisma.availabilitySlot.findFirst({
+    const existingSlot = await db.availabilitySlot.findFirst({
       where: {
         id: slotId,
         doctorId: userId
@@ -226,10 +227,10 @@ router.put('/availability/:slotId', authenticateToken, requireRole('DOCTOR'), as
     });
 
     if (!existingSlot) {
-      return res.status(404).json({ error: 'Availability slot not found' });
+      throw createError('Availability slot not found', 404);
     }
 
-    const updatedSlot = await prisma.availabilitySlot.update({
+    const updatedSlot = await db.availabilitySlot.update({
       where: { id: slotId },
       data: {
         dayOfWeek: dayOfWeek ?? undefined,
@@ -240,27 +241,27 @@ router.put('/availability/:slotId', authenticateToken, requireRole('DOCTOR'), as
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: updatedSlot
     });
 
   } catch (error) {
-    logger.error('Failed to update availability slot:', error);
-    res.status(500).json({ error: 'Failed to update availability slot' });
+    next(error);
   }
 });
 
 // Get quality metrics
-router.get('/quality-metrics', authenticateToken, async (req: Request, res: Response) => {
+router.get('/quality-metrics', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
+    const db = getDatabase();
 
-    const qualityMetrics = await prisma.doctorQualityMetrics.findUnique({
+    const qualityMetrics = await db.doctorQualityMetrics.findUnique({
       where: { doctorId: userId }
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: qualityMetrics || {
         patientSatisfactionScore: 0,
         averageConsultationTime: 0,
@@ -271,18 +272,18 @@ router.get('/quality-metrics', authenticateToken, async (req: Request, res: Resp
     });
 
   } catch (error) {
-    logger.error('Failed to get quality metrics:', error);
-    res.status(500).json({ error: 'Failed to get quality metrics' });
+    next(error);
   }
 });
 
 // Get patient insights
-router.get('/patient-insights', authenticateToken, async (req: Request, res: Response) => {
+router.get('/patient-insights', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
+    const db = getDatabase();
 
     // Get recent appointments and patient data
-    const appointments = await prisma.appointment.findMany({
+    const appointments = await db.appointment.findMany({
       where: { doctorId: userId },
       include: {
         patient: {
@@ -308,23 +309,23 @@ router.get('/patient-insights', authenticateToken, async (req: Request, res: Res
     };
 
     res.json({
-      success: true,
+      status: 'success',
       data: insights
     });
 
   } catch (error) {
-    logger.error('Failed to get patient insights:', error);
-    res.status(500).json({ error: 'Failed to get patient insights' });
+    next(error);
   }
 });
 
 // Create prescription
-router.post('/prescription', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
+router.post('/prescription', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const { medicalRecordId, medications, instructions, diagnosis } = req.body;
+    const db = getDatabase();
 
-    const prescription = await prisma.prescription.create({
+    const prescription = await db.prescription.create({
       data: {
         medicalRecordId,
         medicationName: medications?.medicationName ?? '',
@@ -339,20 +340,19 @@ router.post('/prescription', authenticateToken, requireRole('DOCTOR'), async (re
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: prescription
     });
 
   } catch (error) {
-    logger.error('Failed to create prescription:', error);
-    res.status(500).json({ error: 'Failed to create prescription' });
+    next(error);
   }
 });
 
 // Create medical record
-router.post('/medical-record', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response) => {
+router.post('/medical-record', authenticateToken, requireRole('DOCTOR'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const { patientId, appointmentId, treatment, notes, diagnosis, symptoms, visitSummary, followUpRequired } = req.body as {
       patientId: string;
       appointmentId?: string;
@@ -363,8 +363,9 @@ router.post('/medical-record', authenticateToken, requireRole('DOCTOR'), async (
       visitSummary?: string;
       followUpRequired?: boolean;
     };
+    const db = getDatabase();
 
-    const medicalRecord = await prisma.medicalRecord.create({
+    const medicalRecord = await db.medicalRecord.create({
       data: {
         patientId,
         doctorId: userId!,
@@ -380,13 +381,12 @@ router.post('/medical-record', authenticateToken, requireRole('DOCTOR'), async (
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: medicalRecord
     });
 
   } catch (error) {
-    logger.error('Failed to create medical record:', error);
-    res.status(500).json({ error: 'Failed to create medical record' });
+    next(error);
   }
 });
 

@@ -4,8 +4,12 @@ import { logger } from '../utils/logger';
 import { AppointmentStatus } from '@prisma/client';
 
 export class AppointmentService {
-  private db = getDatabase();
-  private redis = getRedis();
+  private get db() {
+    return getDatabase();
+  }
+  private get redis() {
+    return getRedis();
+  }
 
   async createAppointment(appointmentData: any): Promise<any> {
     try {

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { PrismaClient } from '@prisma/client';
+import { getDatabase } from '../config/database';
 import { logger } from '../utils/logger';
 
 export interface KBDocument {
@@ -19,7 +19,9 @@ export interface RetrievalResult {
 }
 
 export class RAGService {
-  private db = new PrismaClient();
+  private get db() {
+    return getDatabase();
+  }
   private apiKey: string;
   private baseUrl: string;
 

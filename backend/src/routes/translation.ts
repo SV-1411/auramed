@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
+import { createError } from '../middleware/errorHandler';
+import { NextFunction } from 'express';
 import { OpenAIService } from '../services/OpenAIService';
 import { translationService } from '../services/TranslationService';
 
@@ -50,20 +52,16 @@ const MEDICAL_TERMS = {
 };
 
 // Translate medical text (matching frontend expectations)
-router.post('/translate', authenticateToken, async (req: Request, res: Response) => {
+router.post('/translate', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { text, sourceLanguage, targetLanguage, context } = req.body;
 
     if (!text || !sourceLanguage || !targetLanguage) {
-      return res.status(400).json({
-        error: 'Text, source language, and target language are required'
-      });
+      throw createError('Text, source language, and target language are required', 400);
     }
 
     if (!SUPPORTED_LANGUAGES[sourceLanguage as keyof typeof SUPPORTED_LANGUAGES] || !SUPPORTED_LANGUAGES[targetLanguage as keyof typeof SUPPORTED_LANGUAGES]) {
-      return res.status(400).json({
-        error: 'Unsupported language code'
-      });
+      throw createError('Unsupported language code', 400);
     }
 
     // Detect medical terms in the source text
@@ -93,27 +91,22 @@ router.post('/translate', authenticateToken, async (req: Request, res: Response)
     };
 
     res.json({
-      success: true,
+      status: 'success',
       data: { translation: result }
     });
 
   } catch (error) {
-    logger.error('Translation error:', error);
-    res.status(500).json({
-      error: 'Translation service temporarily unavailable'
-    });
+    next(error);
   }
 });
 
 // AI Chat in preferred language (matching frontend expectations)
-router.post('/chat', authenticateToken, async (req: Request, res: Response) => {
+router.post('/chat', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { message, preferredLanguage, medicalContext } = req.body;
 
     if (!message || !preferredLanguage) {
-      return res.status(400).json({
-        error: 'Message and preferred language are required'
-      });
+      throw createError('Message and preferred language are required', 400);
     }
 
     // Create system prompt based on language and context
@@ -142,7 +135,7 @@ router.post('/chat', authenticateToken, async (req: Request, res: Response) => {
     }
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         response: translatedResponse,
         originalResponse: aiResponse,
@@ -154,17 +147,14 @@ router.post('/chat', authenticateToken, async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    logger.error('AI Chat error:', error);
-    res.status(500).json({
-      error: 'AI chat service temporarily unavailable'
-    });
+    next(error);
   }
 });
 
 // Get supported languages (matching frontend expectations)
 router.get('/languages', authenticateToken, async (req: Request, res: Response) => {
   res.json({
-    success: true,
+    status: 'success',
     data: {
       languages: SUPPORTED_LANGUAGES,
       medicalSupport: true,
@@ -174,31 +164,28 @@ router.get('/languages', authenticateToken, async (req: Request, res: Response) 
 });
 
 // Get translation history (placeholder for now)
-router.get('/history', authenticateToken, async (req: Request, res: Response) => {
+router.get('/history', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     // This would typically fetch from database
     res.json({
-      success: true,
+      status: 'success',
       data: {
         translations: [],
         total: 0
       }
     });
   } catch (error) {
-    logger.error('Translation history error:', error);
-    res.status(500).json({
-      error: 'Failed to fetch translation history'
-    });
+    next(error);
   }
 });
 
 // Legacy endpoints (keeping for backward compatibility)
-router.post('/translate-medical', authenticateToken, async (req: Request, res: Response) => {
+router.post('/translate-medical', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { text, targetLanguage, sourceLanguage } = req.body;
 
     if (!text || !targetLanguage) {
-      return res.status(400).json({ error: 'Text and target language are required' });
+      throw createError('Text and target language are required', 400);
     }
 
     const translatedText = await translationService.translateMedicalText(text, {
@@ -207,7 +194,7 @@ router.post('/translate-medical', authenticateToken, async (req: Request, res: R
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         originalText: text,
         translatedText,
@@ -217,8 +204,7 @@ router.post('/translate-medical', authenticateToken, async (req: Request, res: R
     });
 
   } catch (error) {
-    logger.error('Medical translation failed:', error);
-    res.status(500).json({ error: 'Medical translation failed' });
+    next(error);
   }
 });
 

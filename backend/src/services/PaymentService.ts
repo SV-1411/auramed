@@ -1,6 +1,7 @@
-import { PrismaClient, PaymentStatus, PaymentMethod } from '@prisma/client';
+import { PaymentStatus, PaymentMethod } from '@prisma/client';
 import { logger } from '../utils/logger';
 import Stripe from 'stripe';
+import { getDatabase } from '../config/database';
 
 interface PaymentRequest {
   appointmentId: string;
@@ -20,11 +21,12 @@ interface PaymentResult {
 }
 
 export class PaymentService {
-  private prisma: PrismaClient;
+  private get db() {
+    return getDatabase();
+  }
   private stripe: Stripe;
 
   constructor() {
-    this.prisma = new PrismaClient();
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
       apiVersion: '2023-10-16'
     });
@@ -53,7 +55,7 @@ export class PaymentService {
       });
 
       // Save payment record
-      const paymentRecord = await this.prisma.paymentTransaction.create({
+      const paymentRecord = await this.db.paymentTransaction.create({
         data: {
           appointmentId: request.appointmentId,
           patientId: request.patientId,
@@ -79,7 +81,7 @@ export class PaymentService {
       logger.error('Payment processing failed:', error);
       
       // Save failed payment record
-      await this.prisma.paymentTransaction.create({
+      await this.db.paymentTransaction.create({
         data: {
           appointmentId: request.appointmentId,
           patientId: request.patientId,
@@ -101,7 +103,7 @@ export class PaymentService {
   }
 
   private async createDeferredPayment(request: PaymentRequest): Promise<PaymentResult> {
-    const paymentRecord = await this.prisma.paymentTransaction.create({
+    const paymentRecord = await this.db.paymentTransaction.create({
       data: {
         appointmentId: request.appointmentId,
         patientId: request.patientId,
@@ -124,7 +126,7 @@ export class PaymentService {
     try {
       // Razorpay integration would go here
       // For now, simulate successful payment
-      const paymentRecord = await this.prisma.paymentTransaction.create({
+      const paymentRecord = await this.db.paymentTransaction.create({
         data: {
           appointmentId: request.appointmentId,
           patientId: request.patientId,
@@ -158,7 +160,7 @@ export class PaymentService {
 
   async refundPayment(paymentId: string, amount?: number): Promise<boolean> {
     try {
-      const payment = await this.prisma.paymentTransaction.findUnique({
+      const payment = await this.db.paymentTransaction.findUnique({
         where: { id: paymentId }
       });
 
@@ -172,7 +174,7 @@ export class PaymentService {
       });
 
       // Update payment record
-      await this.prisma.paymentTransaction.update({
+      await this.db.paymentTransaction.update({
         where: { id: paymentId },
         data: {
           status: PaymentStatus.REFUNDED,
@@ -193,7 +195,7 @@ export class PaymentService {
 
   async getPaymentStatus(paymentId: string): Promise<PaymentResult | null> {
     try {
-      const payment = await this.prisma.paymentTransaction.findUnique({
+      const payment = await this.db.paymentTransaction.findUnique({
         where: { id: paymentId }
       });
 
@@ -217,7 +219,7 @@ export class PaymentService {
 
   async processDeferredPayments(): Promise<void> {
     try {
-      const deferredPayments = await this.prisma.paymentTransaction.findMany({
+      const deferredPayments = await this.db.paymentTransaction.findMany({
         where: {
           status: PaymentStatus.DEFERRED
         }
@@ -228,7 +230,7 @@ export class PaymentService {
         logger.info(`Processing deferred payment: ${payment.id}`);
         
         // Update status to pending for manual collection
-        await this.prisma.paymentTransaction.update({
+        await this.db.paymentTransaction.update({
           where: { id: payment.id },
           data: { status: PaymentStatus.PENDING }
         });

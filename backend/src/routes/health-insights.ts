@@ -2,11 +2,13 @@ import express, { Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { healthInsightsService } from '../services/HealthInsightsService';
 import { logger } from '../utils/logger';
+import { createError } from '../middleware/errorHandler';
+import { NextFunction } from 'express';
 
 const router = express.Router();
 
 // Get health insights for current authenticated user
-router.get('/', authenticateToken, async (req: Request, res: Response) => {
+router.get('/', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.id;
     const { limit = 5 } = req.query;
@@ -14,85 +16,78 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
     const insights = await healthInsightsService.generateHealthInsights(userId!);
 
     res.json({
-      success: true,
+      status: 'success',
       data: { insights: insights.slice(0, parseInt(limit as string)) }
     });
   } catch (error) {
-    logger.error('Failed to get health insights:', error);
-    res.status(500).json({ error: 'Failed to get health insights' });
+    next(error);
   }
 });
 
 // Get health insights for a patient
-router.get('/:patientId', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:patientId', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { patientId } = req.params;
     const userId = req.user?.id;
 
-    // Ensure user can only access their own insights or is a doctor/admin
     if (userId !== patientId && req.user?.role !== 'doctor' && req.user?.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied' });
+      throw createError('Access denied', 403);
     }
 
     const insights = await healthInsightsService.generateHealthInsights(patientId);
 
     res.json({
-      success: true,
+      status: 'success',
       data: { insights }
     });
 
   } catch (error) {
-    logger.error('Failed to get health insights:', error);
-    res.status(500).json({ error: 'Failed to get health insights' });
+    next(error);
   }
 });
 
 // Get predictive analysis for a patient
-router.get('/:patientId/predictive-analysis', authenticateToken, async (req: Request, res: Response) => {
+router.get('/:patientId/predictive-analysis', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { patientId } = req.params;
     const userId = req.user?.id;
 
-    // Ensure user can only access their own analysis or is a doctor/admin
     if (userId !== patientId && req.user?.role !== 'doctor' && req.user?.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied' });
+      throw createError('Access denied', 403);
     }
 
     const analysis = await healthInsightsService.generatePredictiveAnalysis(patientId);
 
     res.json({
-      success: true,
+      status: 'success',
       data: analysis
     });
 
   } catch (error) {
-    logger.error('Failed to get predictive analysis:', error);
-    res.status(500).json({ error: 'Failed to get predictive analysis' });
+    next(error);
   }
 });
 
 // Refresh health insights for a patient
-router.post('/:patientId/refresh', authenticateToken, async (req: Request, res: Response) => {
+router.post('/:patientId/refresh', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { patientId } = req.params;
     const userId = req.user?.id;
 
-    // Ensure user can only refresh their own insights or is a doctor/admin
     if (userId !== patientId && req.user?.role !== 'doctor' && req.user?.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied' });
+      throw createError('Access denied', 403);
     }
 
     const insights = await healthInsightsService.generateHealthInsights(patientId);
 
     res.json({
-      success: true,
+      status: 'success',
       message: 'Health insights refreshed successfully',
       data: { insights }
     });
 
   } catch (error) {
-    logger.error('Failed to refresh health insights:', error);
-    res.status(500).json({ error: 'Failed to refresh health insights' });
+    next(error);
   }
 });
 

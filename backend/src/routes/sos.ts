@@ -37,7 +37,7 @@ router.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        throw createError('Validation failed', 400);
       }
 
       const patientId = (req as any).user.userId as string;
@@ -92,7 +92,7 @@ router.patch(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        throw createError('Validation failed', 400);
       }
 
       const patientId = (req as any).user.userId as string;
@@ -196,8 +196,7 @@ router.get(
       const lat = Number(latitude);
       const lon = Number(longitude);
       const radius = Number(radiusKm);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        return res.status(400).json({ error: 'latitude and longitude query params are required' });
+        throw createError('latitude and longitude query params are required', 400);
       }
 
       const db = getDatabase();

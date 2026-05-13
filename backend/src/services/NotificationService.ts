@@ -1,7 +1,8 @@
-import { PrismaClient, AppointmentStatus, Severity, AlertType } from '@prisma/client';
+import { AppointmentStatus, Severity, AlertType } from '@prisma/client';
 import { logger } from '../utils/logger';
 import nodemailer, { Transporter } from 'nodemailer';
 import twilio from 'twilio';
+import { getDatabase } from '../config/database';
 
 interface Appointment {
   id: string;
@@ -20,26 +21,27 @@ interface NotificationPreferences {
 }
 
 export class NotificationService {
-  private prisma: PrismaClient;
+  private get db() {
+    return getDatabase();
+  }
   private emailTransporter!: Transporter;
   private twilioClient?: any;
 
   constructor() {
-    this.prisma = new PrismaClient();
     this.setupEmailTransporter();
     this.setupTwilioClient();
   }
 
   async notifyDoctorNewAppointment(doctorId: string, appointment: Appointment): Promise<void> {
     try {
-      const doctor = await this.prisma.user.findUnique({
+      const doctor = await this.db.user.findUnique({
         where: { id: doctorId },
         include: { doctorProfile: true }
       });
 
       if (!doctor) return;
 
-      const patient = await this.prisma.user.findUnique({
+      const patient = await this.db.user.findUnique({
         where: { id: appointment.patientId },
         include: { patientProfile: true }
       });
@@ -96,7 +98,7 @@ export class NotificationService {
 
   async sendAppointmentConfirmation(patientId: string, appointment: Appointment): Promise<void> {
     try {
-      const patient = await this.prisma.user.findUnique({
+      const patient = await this.db.user.findUnique({
         where: { id: patientId },
         include: { patientProfile: true }
       });
@@ -105,7 +107,7 @@ export class NotificationService {
         throw new Error('Patient not found');
       }
 
-      const doctor = await this.prisma.user.findUnique({
+      const doctor = await this.db.user.findUnique({
         where: { id: appointment.doctorId },
         include: { doctorProfile: true }
       });
@@ -136,7 +138,7 @@ export class NotificationService {
 
   async sendUrgentAppointmentAlert(patientId: string, appointment: Appointment): Promise<void> {
     try {
-      const patient = await this.prisma.user.findUnique({
+      const patient = await this.db.user.findUnique({
         where: { id: patientId },
         include: { patientProfile: true }
       });
@@ -168,14 +170,14 @@ export class NotificationService {
 
   async notifyDoctorUrgentConsultation(doctorId: string, appointment: Appointment): Promise<void> {
     try {
-      const doctor = await this.prisma.user.findUnique({
+      const doctor = await this.db.user.findUnique({
         where: { id: doctorId },
         include: { doctorProfile: true }
       });
 
       if (!doctor) return;
 
-      const patient = await this.prisma.user.findUnique({
+      const patient = await this.db.user.findUnique({
         where: { id: appointment.patientId },
         include: { patientProfile: true }
       });
@@ -203,7 +205,7 @@ export class NotificationService {
 
   async sendAppointmentReminder(appointmentId: string): Promise<void> {
     try {
-      const appointment = await this.prisma.appointment.findUnique({
+      const appointment = await this.db.appointment.findUnique({
         where: { id: appointmentId },
         include: {
           patient: { include: { patientProfile: true } },
@@ -239,7 +241,7 @@ export class NotificationService {
 
   async sendMedicationReminder(patientId: string, medicationName: string, dosage: string): Promise<void> {
     try {
-      const patient = await this.prisma.user.findUnique({
+      const patient = await this.db.user.findUnique({
         where: { id: patientId },
         include: { patientProfile: true }
       });
@@ -261,7 +263,7 @@ export class NotificationService {
 
   async sendSystemAlert(userId: string, alertType: string, message: string): Promise<void> {
     try {
-      const user = await this.prisma.user.findUnique({
+      const user = await this.db.user.findUnique({
         where: { id: userId }
       });
 
@@ -278,7 +280,7 @@ export class NotificationService {
         ? (alertType as unknown as AlertType)
         : AlertType.SYSTEM_ERROR;
 
-      await this.prisma.systemAlert.create({
+      await this.db.systemAlert.create({
         data: {
           type: typeEnum,
           severity: Severity.WARNING,
@@ -356,8 +358,7 @@ export class NotificationService {
   // Schedules and notifies a follow-up reminder for a given patient and doctor
   public async scheduleFollowUpReminder(patientId: string, doctorId: string, followUpDate: Date): Promise<void> {
     try {
-      const patient = await this.prisma.user.findUnique({ where: { id: patientId } });
-      const doctor = await this.prisma.user.findUnique({ where: { id: doctorId } });
+      const patient = await this.db.user.findUnique({ where: { id: patientId } });
 
       const msg = `Your follow-up appointment is scheduled for ${followUpDate.toLocaleString()}.`;
 
@@ -441,7 +442,7 @@ export class NotificationService {
   async scheduleReminders(): Promise<void> {
     try {
       // Get appointments in the next hour that need reminders
-      const upcomingAppointments = await this.prisma.appointment.findMany({
+      const upcomingAppointments = await this.db.appointment.findMany({
         where: {
           scheduledAt: {
             gte: new Date(),

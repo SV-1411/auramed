@@ -2,7 +2,8 @@ import express, { Request, Response } from 'express';
 import { PrismaClient, VideoConsultationStatus, AppointmentStatus } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
-import twilio from 'twilio';
+import { createError } from '../middleware/errorHandler';
+import { NextFunction } from 'express';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -25,10 +26,10 @@ try {
 }
 
 // Generate video consultation room
-router.post('/create-room', authenticateToken, async (req, res) => {
+router.post('/create-room', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { appointmentId } = req.body;
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
 
     // Verify appointment exists and user has access
     const appointment = await prisma.appointment.findFirst({
@@ -46,19 +47,12 @@ router.post('/create-room', authenticateToken, async (req, res) => {
     });
 
     if (!appointment) {
-      return res.status(404).json({ error: 'Appointment not found' });
+      throw createError('Appointment not found', 404);
     }
 
     // Check if Twilio is available
     if (!twilioClient) {
-      return res.status(503).json({ 
-        error: 'Video consultation service not available - Twilio not configured',
-        mockRoom: {
-          sid: `mock_room_${appointmentId}`,
-          uniqueName: `consultation_${appointmentId}`,
-          status: 'in-progress'
-        }
-      });
+      throw createError('Video consultation service not available - Twilio not configured', 503);
     }
 
     // Create Twilio video room
@@ -132,16 +126,15 @@ router.post('/create-room', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Failed to create video room:', error);
-    res.status(500).json({ error: 'Failed to create video consultation room' });
+    next(error);
   }
 });
 
 // Join video consultation
-router.get('/join/:appointmentId', authenticateToken, async (req, res) => {
+router.get('/join/:appointmentId', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { appointmentId } = req.params;
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
 
     const videoConsultation = await prisma.videoConsultation.findFirst({
       where: {
@@ -164,7 +157,7 @@ router.get('/join/:appointmentId', authenticateToken, async (req, res) => {
     });
 
     if (!videoConsultation) {
-      return res.status(404).json({ error: 'Video consultation not found' });
+      throw createError('Video consultation not found', 404);
     }
 
     // Update consultation status
@@ -191,7 +184,7 @@ router.get('/join/:appointmentId', authenticateToken, async (req, res) => {
     const token = joinToken.toJwt();
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         roomName: `consultation_${appointmentId}`,
         token,
@@ -201,13 +194,12 @@ router.get('/join/:appointmentId', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Failed to join video consultation:', error);
-    res.status(500).json({ error: 'Failed to join video consultation' });
+    next(error);
   }
 });
 
 // End video consultation
-router.post('/end/:appointmentId', authenticateToken, async (req, res) => {
+router.post('/end/:appointmentId', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { appointmentId } = req.params;
     const { duration, summary } = req.body;
@@ -219,7 +211,7 @@ router.post('/end/:appointmentId', authenticateToken, async (req, res) => {
     });
 
     if (!videoConsultation) {
-      return res.status(404).json({ error: 'Video consultation not found' });
+      throw createError('Video consultation not found', 404);
     }
 
     // End Twilio room
@@ -243,18 +235,17 @@ router.post('/end/:appointmentId', authenticateToken, async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: 'success',
       message: 'Video consultation ended successfully'
     });
 
   } catch (error) {
-    logger.error('Failed to end video consultation:', error);
-    res.status(500).json({ error: 'Failed to end video consultation' });
+    next(error);
   }
 });
 
 // Get consultation recordings
-router.get('/recordings/:appointmentId', authenticateToken, async (req, res) => {
+router.get('/recordings/:appointmentId', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { appointmentId } = req.params;
 
@@ -273,7 +264,7 @@ router.get('/recordings/:appointmentId', authenticateToken, async (req, res) => 
       .recordings.list();
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         recordings: recordings.map((recording: any) => ({
           sid: recording.sid,
@@ -287,8 +278,7 @@ router.get('/recordings/:appointmentId', authenticateToken, async (req, res) => 
     });
 
   } catch (error) {
-    logger.error('Failed to get recordings:', error);
-    res.status(500).json({ error: 'Failed to get consultation recordings' });
+    next(error);
   }
 });
 

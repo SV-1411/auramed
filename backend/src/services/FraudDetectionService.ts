@@ -1,5 +1,6 @@
-import { PrismaClient, UserRole, AlertType, Severity } from '@prisma/client';
+import { UserRole, AlertType, Severity } from '@prisma/client';
 import { logger } from '../utils/logger';
+import { getDatabase } from '../config/database';
 
 export interface SuspiciousPayment {
   id: string;
@@ -26,10 +27,8 @@ export interface CredentialFraud {
 }
 
 export class FraudDetectionService {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = new PrismaClient();
+  private get db() {
+    return getDatabase();
   }
 
   async detectSuspiciousPayments(): Promise<SuspiciousPayment[]> {
@@ -37,7 +36,7 @@ export class FraudDetectionService {
       const suspiciousPayments: SuspiciousPayment[] = [];
       
       // Get recent payments for analysis
-      const recentPayments = await this.prisma.paymentTransaction.findMany({
+      const recentPayments = await this.db.paymentTransaction.findMany({
         where: {
           createdAt: {
             gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
@@ -86,7 +85,7 @@ export class FraudDetectionService {
       const fakeAppointments: FakeAppointment[] = [];
       
       // Get recent appointments
-      const recentAppointments = await this.prisma.appointment.findMany({
+      const recentAppointments = await this.db.appointment.findMany({
         where: {
           createdAt: {
             gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
@@ -130,7 +129,7 @@ export class FraudDetectionService {
       const credentialIssues: CredentialFraud[] = [];
       
       // Get all doctors for credential verification
-      const doctors = await this.prisma.user.findMany({
+      const doctors = await this.db.user.findMany({
         where: { role: UserRole.DOCTOR },
         include: { doctorProfile: true }
       });
@@ -304,7 +303,7 @@ export class FraudDetectionService {
   }): Promise<void> {
     try {
       // No FraudIncident model in schema; raising a SystemAlert instead
-      await this.prisma.systemAlert.create({
+      await this.db.systemAlert.create({
         data: {
           type: AlertType.FRAUD_DETECTION,
           severity: this.mapSeverity(incidentData.severity),

@@ -1,16 +1,15 @@
-import { PrismaClient, User, UserRole } from '@prisma/client';
+import { User, UserRole } from '@prisma/client';
 import { logger } from '../utils/logger';
+import { getDatabase } from '../config/database';
 
 export class UserService {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = new PrismaClient();
+  private get db() {
+    return getDatabase();
   }
 
   async getUserById(userId: string): Promise<User | null> {
     try {
-      return await this.prisma.user.findUnique({
+      return await this.db.user.findUnique({
         where: { id: userId },
         include: {
           patientProfile: true,
@@ -30,7 +29,7 @@ export class UserService {
 
   async getUserByEmail(email: string): Promise<User | null> {
     try {
-      return await this.prisma.user.findUnique({
+      return await this.db.user.findUnique({
         where: { email },
         include: {
           patientProfile: true,
@@ -46,7 +45,7 @@ export class UserService {
 
   async getAllDoctors(): Promise<User[]> {
     try {
-      return await this.prisma.user.findMany({
+      return await this.db.user.findMany({
         where: { role: UserRole.DOCTOR },
         include: {
           doctorProfile: true,
@@ -61,7 +60,7 @@ export class UserService {
 
   async updateDoctorQualityScore(doctorId: string, qualityScore: number): Promise<void> {
     try {
-      await this.prisma.user.update({
+      await this.db.user.update({
         where: { id: doctorId },
         data: {
           doctorProfile: {
@@ -85,7 +84,7 @@ export class UserService {
     phone: string;
   }): Promise<User> {
     try {
-      return await this.prisma.user.create({
+      return await this.db.user.create({
         data: {
           email: userData.email,
           password: userData.password,
@@ -101,7 +100,7 @@ export class UserService {
 
   async updateUser(userId: string, updateData: Partial<User>): Promise<User> {
     try {
-      return await this.prisma.user.update({
+      return await this.db.user.update({
         where: { id: userId },
         data: updateData
       });
@@ -113,7 +112,7 @@ export class UserService {
 
   async deleteUser(userId: string): Promise<void> {
     try {
-      await this.prisma.user.update({
+      await this.db.user.update({
         where: { id: userId },
         data: { isActive: false }
       });
@@ -126,7 +125,7 @@ export class UserService {
 
   async verifyUserCredentials(email: string, password: string): Promise<User | null> {
     try {
-      const user = await this.prisma.user.findUnique({
+      const user = await this.db.user.findUnique({
         where: { email },
         include: {
           patientProfile: true,
@@ -154,7 +153,7 @@ export class UserService {
 
   async getUsersByRole(role: UserRole): Promise<User[]> {
     try {
-      return await this.prisma.user.findMany({
+      return await this.db.user.findMany({
         where: { role, isActive: true },
         include: {
           patientProfile: true,

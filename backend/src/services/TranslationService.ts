@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getDatabase } from '../config/database';
 import { logger } from '../utils/logger';
 
 export interface TranslationOptions {
@@ -13,6 +14,7 @@ export interface SupportedLanguage {
 }
 
 export class TranslationService {
+
   private baseUrl: string;
   private supportedLanguages: SupportedLanguage[] = [
     { code: 'en', name: 'English', nativeName: 'English' },

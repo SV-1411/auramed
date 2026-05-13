@@ -1,4 +1,5 @@
-import { PrismaClient, AppointmentStatus } from '@prisma/client';
+import { AppointmentStatus } from '@prisma/client';
+import { getDatabase } from '../config/database';
 import { logger } from '../utils/logger';
 
 export interface ConsultationStats {
@@ -21,15 +22,13 @@ export interface ResponseTimeData {
 }
 
 export class AuditService {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = new PrismaClient();
+  private get db() {
+    return getDatabase();
   }
 
   async logCredentialVerification(doctorId: string, verified: boolean): Promise<void> {
     try {
-      await this.prisma.auditLog.create({
+      await this.db.auditLog.create({
         data: {
           action: 'CREDENTIAL_VERIFICATION',
           entity: 'DOCTOR',
@@ -48,7 +47,7 @@ export class AuditService {
 
   async logQualityRankingUpdate(doctorsUpdated: number): Promise<void> {
     try {
-      await this.prisma.auditLog.create({
+      await this.db.auditLog.create({
         data: {
           action: 'QUALITY_RANKING_UPDATE',
           entity: 'SYSTEM',
@@ -67,7 +66,7 @@ export class AuditService {
 
   async getDoctorConsultationStats(doctorId: string): Promise<ConsultationStats> {
     try {
-      const appointments = await this.prisma.appointment.findMany({
+      const appointments = await this.db.appointment.findMany({
         where: { 
           doctorId,
           status: AppointmentStatus.COMPLETED
@@ -102,7 +101,7 @@ export class AuditService {
   async getDoctorPatientFeedback(doctorId: string): Promise<PatientFeedback> {
     try {
       // doctorId refers to User.id; join via DoctorProfile.userId
-      const profile = await this.prisma.doctorProfile.findUnique({
+      const profile = await this.db.doctorProfile.findUnique({
         where: { userId: doctorId },
         include: { qualityMetrics: true }
       });
@@ -122,7 +121,7 @@ export class AuditService {
 
   async getDoctorResponseTimes(doctorId: string): Promise<ResponseTimeData> {
     try {
-      const appointments = await this.prisma.appointment.findMany({
+      const appointments = await this.db.appointment.findMany({
         where: { 
           doctorId,
           status: { in: [AppointmentStatus.COMPLETED, AppointmentStatus.IN_PROGRESS] }
@@ -164,7 +163,7 @@ export class AuditService {
 
   async logUserAction(userId: string, action: string, entityType: string, entityId: string, details?: any): Promise<void> {
     try {
-      await this.prisma.auditLog.create({
+      await this.db.auditLog.create({
         data: {
           action,
           entity: entityType,
@@ -200,7 +199,7 @@ export class AuditService {
         if (filters.endDate) where.createdAt.lte = filters.endDate;
       }
 
-      return await this.prisma.auditLog.findMany({
+      return await this.db.auditLog.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         take: filters.limit || 100

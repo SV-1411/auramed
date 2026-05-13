@@ -42,7 +42,9 @@ export interface AppointmentRequest {
 }
 
 export class AIAppointmentService {
-  private get db() { return getDatabase(); }
+  private get db() {
+    return getDatabase();
+  }
   private openAI: OpenAIService;
   private notificationService: NotificationService;
 

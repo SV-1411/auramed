@@ -12,22 +12,22 @@
   box-sizing: border-box;
 }
 
-/* Overlay background with dark patches and sapphire tint */
+/* Overlay background with warm earthy patches */
 .auramed-overlay {
   background:
-    radial-gradient(60% 80% at 20% 25%, rgba(0,0,0,0.65), transparent 60%),
-    radial-gradient(50% 70% at 85% 70%, rgba(0,0,0,0.6), transparent 55%),
-    radial-gradient(35% 50% at 70% 20%, rgba(0,0,0,0.5), transparent 60%),
-    linear-gradient(135deg, #020617, #0b1220 60%, #061a2b);
+    radial-gradient(60% 80% at 20% 25%, rgba(45, 30, 22, 0.45), transparent 60%),
+    radial-gradient(50% 70% at 85% 70%, rgba(92, 60, 42, 0.4), transparent 55%),
+    radial-gradient(35% 50% at 70% 20%, rgba(139, 94, 60, 0.3), transparent 60%),
+    linear-gradient(135deg, #2d1e16, #4a3225 60%, #5c3c2a);
 }
 
-/* Floating black patch blobs */
+/* Floating warm amber blobs */
 .auramed-blob {
   position: absolute;
   border-radius: 50%;
   filter: blur(14px);
-  background: radial-gradient(circle at 30% 35%, rgba(0,0,0,0.9), rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.2) 70%, transparent 80%);
-  opacity: 0.7;
+  background: radial-gradient(circle at 30% 35%, rgba(166, 124, 82, 0.6), rgba(139, 94, 60, 0.4) 60%, rgba(92, 60, 42, 0.2) 70%, transparent 80%);
+  opacity: 0.5;
   animation: auramed-blob-float 8s ease-in-out infinite;
 }
 
@@ -42,7 +42,7 @@
   100% { transform: translate3d(0, 0, 0) scale(1); }
 }
 
-/* Sapphire glow ring behind text */
+/* Amber glow ring behind text */
 .auramed-glow {
   position: absolute;
   inset: auto 0 0 0;
@@ -50,28 +50,28 @@
   width: min(60vw, 700px);
   height: 18px;
   border-radius: 9999px;
-  background: radial-gradient(60% 100% at 50% 50%, rgba(14,165,233,0.55), rgba(99,102,241,0.4) 60%, rgba(168,85,247,0.25) 80%, transparent 85%);
+  background: radial-gradient(60% 100% at 50% 50%, rgba(217, 190, 164, 0.55), rgba(193, 154, 123, 0.4) 60%, rgba(166, 124, 82, 0.25) 80%, transparent 85%);
   filter: blur(18px);
 }
 
-/* Animated underline progress bar */
+/* Animated underline progress bar (Warm Earth) */
 .auramed-progress {
   height: 4px;
   width: min(60vw, 680px);
   border-radius: 9999px;
   margin: 14px auto 0 auto;
   overflow: hidden;
-  background: rgba(2,6,23,0.4);
-  box-shadow: inset 0 0 0 1px rgba(2,6,23,0.5);
+  background: rgba(45, 30, 22, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(45, 30, 22, 0.5);
 }
 
 .auramed-progress > span {
   display: block;
   height: 100%;
   width: 35%;
-  background: linear-gradient(90deg, #0ea5e9, #6366f1);
+  background: linear-gradient(90deg, #a67c52, #c19a7b);
   animation: auramed-progress-move 1.4s ease-in-out infinite;
-  box-shadow: 0 0 12px rgba(14,165,233,0.6), 0 0 18px rgba(99,102,241,0.5);
+  box-shadow: 0 0 12px rgba(166, 124, 82, 0.6), 0 0 18px rgba(193, 154, 123, 0.5);
 }
 
 @keyframes auramed-progress-move {
@@ -100,7 +100,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #8b5e3c 0%, #5c3c2a 100%);
   padding: 2rem 1rem;
 }
 
@@ -122,7 +122,7 @@ body {
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+  background: linear-gradient(90deg, #8b5e3c, #5c3c2a, #d9bea4);
 }
 
 /* Header Styling */
@@ -137,10 +137,10 @@ body {
   justify-content: center;
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #8b5e3c, #5c3c2a);
   border-radius: 50%;
   margin-bottom: 1.5rem;
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 10px 30px rgba(139, 94, 60, 0.3);
 }
 
 .logo-icon {
@@ -201,8 +201,8 @@ body {
 
 .form-input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #8b5e3c;
+  box-shadow: 0 0 0 3px rgba(139, 94, 60, 0.1);
   transform: translateY(-1px);
 }
 
@@ -255,10 +255,10 @@ body {
 }
 
 .role-button.active {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border-color: #667eea;
+  background: linear-gradient(135deg, #8b5e3c, #5c3c2a);
+  border-color: #8b5e3c;
   color: white;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px rgba(139, 94, 60, 0.3);
 }
 
 /* Password Input with Icon */
@@ -328,7 +328,7 @@ body {
 .submit-button {
   width: 100%;
   padding: 1rem 2rem;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #8b5e3c, #5c3c2a);
   color: white;
   border: none;
   border-radius: 12px;
@@ -337,7 +337,7 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
   margin-top: 1rem;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px rgba(139, 94, 60, 0.3);
 }
 
 .submit-button:hover:not(:disabled) {
@@ -371,7 +371,7 @@ body {
 }
 
 .form-link {
-  color: #667eea;
+  color: #8b5e3c;
   text-decoration: none;
   font-weight: 600;
   transition: color 0.2s ease;
@@ -444,7 +444,7 @@ body {
 
 /* AuraMed Loader Animated Text */
 .auramed-text {
-  background: linear-gradient(90deg, #0ea5e9, #6366f1, #a855f7, #0ea5e9);
+  background: linear-gradient(90deg, #a67c52, #8b5e3c, #724a31, #a67c52);
   background-size: 300% 100%;
   -webkit-background-clip: text;
   background-clip: text;

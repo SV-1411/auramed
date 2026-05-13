@@ -1,14 +1,15 @@
-import express, { Request, Response } from 'express';
-import { PrismaClient, UserRole, AlertType, AppointmentStatus } from '@prisma/client';
+import express, { Response, NextFunction } from 'express';
 import { authenticateToken, requireRole, AuthenticatedRequest } from '../middleware/auth';
 import { logger } from '../utils/logger';
+import { createError } from '../middleware/errorHandler';
+import { getDatabase } from '../config/database';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get admin dashboard stats
-router.get('/dashboard-stats', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/dashboard-stats', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    const db = getDatabase();
     const [
       totalUsers,
       totalDoctors,
@@ -17,23 +18,23 @@ router.get('/dashboard-stats', authenticateToken, requireRole('ADMIN'), async (r
       pendingVerifications,
       systemAlerts
     ] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { role: UserRole.DOCTOR } }),
-      prisma.user.count({ where: { role: UserRole.PATIENT } }),
-      prisma.appointment.count(),
-      prisma.user.count({ 
+      db.user.count(),
+      db.user.count({ where: { role: 'DOCTOR' } }),
+      db.user.count({ where: { role: 'PATIENT' } }),
+      db.appointment.count(),
+      db.user.count({ 
         where: { 
-          role: UserRole.DOCTOR,
+          role: 'DOCTOR',
           doctorProfile: {
             isVerified: false
           }
         }
       }),
-      prisma.systemAlert.count({ where: { isResolved: false } })
+      db.systemAlert.count({ where: { isResolved: false } })
     ]);
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         totalUsers,
         totalDoctors,
@@ -45,21 +46,22 @@ router.get('/dashboard-stats', authenticateToken, requireRole('ADMIN'), async (r
     });
 
   } catch (error) {
-    logger.error('Failed to get admin dashboard stats:', error);
-    res.status(500).json({ error: 'Failed to get dashboard stats' });
+    next(error);
   }
 });
 
 // Get all users with pagination
-router.get('/users', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/users', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const { role, status, limit = 20, offset = 0, search } = req.query;
+    const { role, status, limit = '20', offset = '0', search } = req.query;
+    const db = getDatabase();
 
     const whereClause: any = {};
     if (role) {
-      const roleKey = String(role).toUpperCase() as keyof typeof UserRole;
-      if (UserRole[roleKey]) {
-        whereClause.role = UserRole[roleKey];
+      const roleKey = String(role).toUpperCase();
+      const validRoles = ['ADMIN', 'DOCTOR', 'PATIENT', 'LAB', 'PHARMACY', 'AMBULANCE'];
+      if (validRoles.includes(roleKey)) {
+        whereClause.role = roleKey;
       }
     }
     if (status) whereClause.isActive = status === 'active';
@@ -71,7 +73,7 @@ router.get('/users', authenticateToken, requireRole('ADMIN'), async (req: Authen
       ];
     }
 
-    const users = await prisma.user.findMany({
+    const users = await db.user.findMany({
       where: whereClause,
       include: {
         doctorProfile: true,
@@ -82,10 +84,10 @@ router.get('/users', authenticateToken, requireRole('ADMIN'), async (req: Authen
       skip: parseInt(offset as string)
     });
 
-    const total = await prisma.user.count({ where: whereClause });
+    const total = await db.user.count({ where: whereClause });
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         users,
         total,
@@ -95,21 +97,21 @@ router.get('/users', authenticateToken, requireRole('ADMIN'), async (req: Authen
     });
 
   } catch (error) {
-    logger.error('Failed to get users:', error);
-    res.status(500).json({ error: 'Failed to get users' });
+    next(error);
   }
 });
 
 // Verify doctor
-router.put('/verify-doctor/:doctorId', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
+router.put('/verify-doctor/:doctorId', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { doctorId } = req.params;
     const { isVerified, verificationNotes } = req.body;
+    const db = getDatabase();
 
-    const doctor = await prisma.user.findFirst({
+    const doctor = await db.user.findFirst({
       where: {
         id: doctorId,
-        role: UserRole.DOCTOR
+        role: 'DOCTOR'
       },
       include: {
         doctorProfile: true
@@ -117,10 +119,10 @@ router.put('/verify-doctor/:doctorId', authenticateToken, requireRole('ADMIN'), 
     });
 
     if (!doctor) {
-      return res.status(404).json({ error: 'Doctor not found' });
+      throw createError('Doctor not found', 404);
     }
 
-    const updatedDoctor = await prisma.user.update({
+    const updatedDoctor = await db.user.update({
       where: { id: doctorId },
       data: {
         doctorProfile: {
@@ -135,36 +137,36 @@ router.put('/verify-doctor/:doctorId', authenticateToken, requireRole('ADMIN'), 
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: updatedDoctor
     });
 
   } catch (error) {
-    logger.error('Failed to verify doctor:', error);
-    res.status(500).json({ error: 'Failed to verify doctor' });
+    next(error);
   }
 });
 
 // Get system alerts
-router.get('/system-alerts', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/system-alerts', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const { severity, isResolved, limit = 20, offset = 0 } = req.query;
+    const { severity, isResolved, limit = '20', offset = '0' } = req.query;
+    const db = getDatabase();
 
     const whereClause: any = {};
     if (severity) whereClause.severity = severity;
     if (isResolved !== undefined) whereClause.isResolved = isResolved === 'true';
 
-    const alerts = await prisma.systemAlert.findMany({
+    const alerts = await db.systemAlert.findMany({
       where: whereClause,
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
       skip: parseInt(offset as string)
     });
 
-    const total = await prisma.systemAlert.count({ where: whereClause });
+    const total = await db.systemAlert.count({ where: whereClause });
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         alerts,
         total,
@@ -174,18 +176,18 @@ router.get('/system-alerts', authenticateToken, requireRole('ADMIN'), async (req
     });
 
   } catch (error) {
-    logger.error('Failed to get system alerts:', error);
-    res.status(500).json({ error: 'Failed to get system alerts' });
+    next(error);
   }
 });
 
 // Resolve system alert
-router.put('/system-alerts/:alertId/resolve', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
+router.put('/system-alerts/:alertId/resolve', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { alertId } = req.params;
     const { resolutionNotes } = req.body;
+    const db = getDatabase();
 
-    const alert = await prisma.systemAlert.update({
+    const alert = await db.systemAlert.update({
       where: { id: alertId },
       data: {
         isResolved: true,
@@ -194,35 +196,35 @@ router.put('/system-alerts/:alertId/resolve', authenticateToken, requireRole('AD
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: alert
     });
 
   } catch (error) {
-    logger.error('Failed to resolve system alert:', error);
-    res.status(500).json({ error: 'Failed to resolve system alert' });
+    next(error);
   }
 });
 
 // Get fraud detection reports
-router.get('/fraud-reports', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/fraud-reports', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const { severity, isResolved, limit = 20, offset = 0 } = req.query;
+    const { severity, isResolved, limit = '20', offset = '0' } = req.query;
+    const db = getDatabase();
 
-    const whereClause: any = { type: AlertType.FRAUD_DETECTION };
+    const whereClause: any = { type: 'FRAUD_DETECTION' };
     if (severity) whereClause.severity = severity;
     if (isResolved !== undefined) whereClause.isResolved = isResolved === 'true';
 
-    const fraudReports = await prisma.systemAlert.findMany({
+    const fraudReports = await db.systemAlert.findMany({
       where: whereClause,
       orderBy: { createdAt: 'desc' },
       take: parseInt(limit as string),
       skip: parseInt(offset as string)
     });
 
-    const total = await prisma.systemAlert.count({ where: whereClause });
+    const total = await db.systemAlert.count({ where: whereClause });
     res.json({
-      success: true,
+      status: 'success',
       data: {
         fraudReports,
         total,
@@ -232,20 +234,20 @@ router.get('/fraud-reports', authenticateToken, requireRole('ADMIN'), async (req
     });
 
   } catch (error) {
-    logger.error('Failed to get fraud reports:', error);
-    res.status(500).json({ error: 'Failed to get fraud reports' });
+    next(error);
   }
 });
 
 // Update fraud report status
-router.put('/fraud-reports/:reportId', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
+router.put('/fraud-reports/:reportId', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { reportId } = req.params;
     const { status } = req.body;
+    const db = getDatabase();
 
     const isResolved = String(status).toLowerCase() === 'resolved';
 
-    const fraudReport = await prisma.systemAlert.update({
+    const fraudReport = await db.systemAlert.update({
       where: { id: reportId },
       data: {
         isResolved,
@@ -254,20 +256,20 @@ router.put('/fraud-reports/:reportId', authenticateToken, requireRole('ADMIN'), 
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: fraudReport
     });
 
   } catch (error) {
-    logger.error('Failed to update fraud report:', error);
-    res.status(500).json({ error: 'Failed to update fraud report' });
+    next(error);
   }
 });
 
 // Get platform analytics
-router.get('/analytics', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/analytics', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { period = '30d' } = req.query;
+    const db = getDatabase();
     
     let startDate = new Date();
     switch (period) {
@@ -290,22 +292,22 @@ router.get('/analytics', authenticateToken, requireRole('ADMIN'), async (req: Au
       newAppointments,
       completedAppointments
     ] = await Promise.all([
-      prisma.user.count({
+      db.user.count({
         where: { createdAt: { gte: startDate } }
       }),
-      prisma.appointment.count({
+      db.appointment.count({
         where: { createdAt: { gte: startDate } }
       }),
-      prisma.appointment.count({
+      db.appointment.count({
         where: { 
-          status: AppointmentStatus.COMPLETED,
+          status: 'COMPLETED',
           updatedAt: { gte: startDate }
         }
       })
     ]);
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         period,
         newUsers,
@@ -317,18 +319,18 @@ router.get('/analytics', authenticateToken, requireRole('ADMIN'), async (req: Au
     });
 
   } catch (error) {
-    logger.error('Failed to get analytics:', error);
-    res.status(500).json({ error: 'Failed to get analytics' });
+    next(error);
   }
 });
 
 // Suspend/unsuspend user
-router.put('/users/:userId/suspend', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response) => {
+router.put('/users/:userId/suspend', authenticateToken, requireRole('ADMIN'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.params;
     const { isActive } = req.body;
+    const db = getDatabase();
 
-    const user = await prisma.user.update({
+    const user = await db.user.update({
       where: { id: userId },
       data: {
         isActive
@@ -336,13 +338,12 @@ router.put('/users/:userId/suspend', authenticateToken, requireRole('ADMIN'), as
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: user
     });
 
   } catch (error) {
-    logger.error('Failed to suspend/unsuspend user:', error);
-    res.status(500).json({ error: 'Failed to update user status' });
+    next(error);
   }
 });
 

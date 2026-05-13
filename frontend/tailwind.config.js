@@ -8,70 +8,70 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Sapphire Blue Theme Colors
-        sapphire: {
-          50: '#f0f7ff',
-          100: '#e0efff',
-          200: '#b8deff',
-          300: '#7cc4ff',
-          400: '#36a7ff',
-          500: '#0c8ce9',
-          600: '#0066cc',
-          700: '#0052a3',
-          800: '#003d7a',
-          900: '#002951',
-          950: '#001a33',
+        // Premium Earthy Theme (Brown/Beige/White)
+        earthy: {
+          50: '#fdfaf6',
+          100: '#f7f0e8',
+          200: '#ecdcc9',
+          300: '#d9bea4',
+          400: '#c19a7b',
+          500: '#a67c52',
+          600: '#8b5e3c',
+          700: '#724a31',
+          800: '#5c3c2a',
+          900: '#4a3225',
+          950: '#2d1e16',
         },
-        // Primary colors (Sapphire Blue)
+        // Primary colors (Brown/Amber)
         primary: {
-          50: '#f0f7ff',
-          100: '#e0efff',
-          200: '#b8deff',
-          300: '#7cc4ff',
-          400: '#36a7ff',
-          500: '#0c8ce9',
-          600: '#0066cc',
-          700: '#0052a3',
-          800: '#003d7a',
-          900: '#002951',
+          50: '#fdfaf6',
+          100: '#f7f0e8',
+          200: '#ecdcc9',
+          300: '#d9bea4',
+          400: '#c19a7b',
+          500: '#a67c52',
+          600: '#8b5e3c',
+          700: '#724a31',
+          800: '#5c3c2a',
+          900: '#4a3225',
         },
-        // Matte variations
+        // Stone/Beige variations
         matte: {
-          blue: {
-            50: '#f8fafc',
-            100: '#f1f5f9',
-            200: '#e2e8f0',
-            300: '#cbd5e1',
-            400: '#94a3b8',
-            500: '#64748b',
-            600: '#475569',
-            700: '#334155',
-            800: '#1e293b',
-            900: '#0f172a',
+          stone: {
+            50: '#fafaf9',
+            100: '#f5f5f4',
+            200: '#e7e5e4',
+            300: '#d6d3d1',
+            400: '#a8a29e',
+            500: '#78716c',
+            600: '#57534e',
+            700: '#44403c',
+            800: '#292524',
+            900: '#1c1917',
           },
         },
-        // Dark theme specific colors
+        // Dark theme specific colors (Coffee/Dark Earth)
         dark: {
-          bg: '#0f172a',
-          surface: '#1e293b',
-          card: '#334155',
-          border: '#475569',
+          bg: '#1a1410',
+          surface: '#2d1e16',
+          card: '#3d2b1f',
+          border: '#4a3225',
           text: {
-            primary: '#f8fafc',
-            secondary: '#cbd5e1',
-            muted: '#94a3b8',
+            primary: '#fdfaf6',
+            secondary: '#ecdcc9',
+            muted: '#a8a29e',
           }
         },
-        // Light theme specific colors
+        // Light theme specific colors (Cream/Beige)
         light: {
-          bg: '#ffffff',
-          surface: '#f8fafc',
+          bg: '#fdfaf6',
+          surface: '#f7f0e8',
           card: '#ffffff',
-          border: '#e2e8f0',
+          border: '#ecdcc9',
           text: {
-            primary: '#0f172a',
-            secondary: '#475569',
-            muted: '#64748b',
+            primary: '#2d1e16',
+            secondary: '#5c3c2a',
+            muted: '#8b5e3c',
           }
         }
       },

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
+import { getDatabase } from '../config/database';
 
 type ChatUserContent =
   | string
@@ -9,6 +10,7 @@ type ChatUserContent =
     >;
 
 export class OpenAIService {
+
   private apiKey: string;
   private baseUrl: string;
   private models: {

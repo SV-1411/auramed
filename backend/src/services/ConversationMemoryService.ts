@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
 import { OpenAIService } from './OpenAIService';
 import { getDatabase } from '../config/database';
@@ -31,7 +30,9 @@ export interface ConversationContext {
 }
 
 export class ConversationMemoryService {
-  private db = new PrismaClient();
+  private get db() {
+    return getDatabase();
+  }
   private openAI: OpenAIService;
 
   constructor() {
@@ -51,8 +52,7 @@ export class ConversationMemoryService {
         });
       } else {
         // Fallback to existing aIAgentMessage model so chats are persisted
-        const db = getDatabase();
-        await (db as any).aIAgentMessage.create({
+        await (this.db as any).aIAgentMessage.create({
           data: {
             id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             agentType: 'PATIENT',
@@ -83,8 +83,7 @@ export class ConversationMemoryService {
         });
       } else {
         // Fallback to aIAgentMessage
-        const db = getDatabase();
-        await (db as any).aIAgentMessage.create({
+        await (this.db as any).aIAgentMessage.create({
           data: {
             id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             agentType: 'PATIENT',
@@ -125,8 +124,7 @@ export class ConversationMemoryService {
       }
 
       // Fallback: read from aIAgentMessage so chat context works even without AIMessage model
-      const db = getDatabase();
-      const agentMessages = await (db as any).aIAgentMessage.findMany({
+      const agentMessages = await (this.db as any).aIAgentMessage.findMany({
         where: {
           OR: [
             { fromUserId: userId },
@@ -237,7 +235,7 @@ Focus on medical relevance: symptoms, diagnoses, medications, allergies, chronic
         }
       });
 
-      if (!user) return { patientContext: {} } as PatientContext;
+      if (!user) return { profile: undefined, recentSymptoms: [], riskFactors: [] };
 
       const profile = user.patientProfile;
 
@@ -259,7 +257,7 @@ Focus on medical relevance: symptoms, diagnoses, medications, allergies, chronic
       };
     } catch (error) {
       logger.error('Failed to get patient context:', error);
-      return { patientContext: {} } as PatientContext;
+      return { profile: undefined, recentSymptoms: [], riskFactors: [] };
     }
   }
 

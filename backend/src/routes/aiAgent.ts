@@ -34,7 +34,7 @@ router.post('/chat', authenticateToken, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      throw createError('Validation failed', 400);
     }
 
     const { message, messageType = 'text', metadata } = req.body;
@@ -163,7 +163,7 @@ router.post('/analyze-symptoms', authenticateToken, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      throw createError('Validation failed', 400);
     }
 
     const userId = (req as any).user.userId;
@@ -234,7 +234,7 @@ router.post('/consultation-summary', authenticateToken, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      throw createError('Validation failed', 400);
     }
 
     const userId = (req as any).user.userId;
@@ -270,7 +270,7 @@ router.post('/verify-doctor', authenticateToken, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      throw createError('Validation failed', 400);
     }
 
     const userRole = (req as any).user.role;

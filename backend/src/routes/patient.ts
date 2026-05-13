@@ -1,56 +1,44 @@
-import express, { Request, Response } from 'express';
-import { PrismaClient, AppointmentStatus } from '@prisma/client';
+import express, { Request, Response, NextFunction } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
-
-// Extend Request interface to include user property
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        userId: string;
-        role: string;
-      };
-    }
-  }
-}
+import { createError } from '../middleware/errorHandler';
+import { getDatabase } from '../config/database';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get patient profile
-router.get('/profile', authenticateToken, async (req: Request, res: Response) => {
+router.get('/profile', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
+    const db = getDatabase();
 
-    const profile = await prisma.patientProfile.findUnique({
+    const profile = await db.patientProfile.findUnique({
       where: { userId },
       include: { familyMembers: true }
     });
 
     if (!profile) {
-      return res.status(404).json({ error: 'Patient not found' });
+      throw createError('Patient profile not found', 404);
     }
 
     res.json({
-      success: true,
+      status: 'success',
       data: profile
     });
 
   } catch (error) {
-    logger.error('Failed to get patient profile:', error);
-    res.status(500).json({ error: 'Failed to get patient profile' });
+    next(error);
   }
 });
 
 // Update patient profile
-router.put('/profile', authenticateToken, async (req: Request, res: Response) => {
+router.put('/profile', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const { firstName, lastName, dateOfBirth, gender, emergencyContact, preferredLanguage } = req.body;
+    const db = getDatabase();
 
-    const updated = await prisma.patientProfile.upsert({
+    const updated = await db.patientProfile.upsert({
       where: { userId },
       update: {
         firstName,
@@ -64,37 +52,40 @@ router.put('/profile', authenticateToken, async (req: Request, res: Response) =>
         userId: userId!,
         firstName,
         lastName,
-        dateOfBirth: new Date(dateOfBirth),
-        gender,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : new Date(),
+        gender: gender || 'OTHER',
         emergencyContact,
         preferredLanguage: preferredLanguage || 'en'
       }
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: updated
     });
 
   } catch (error) {
-    logger.error('Failed to update patient profile:', error);
-    res.status(500).json({ error: 'Failed to update patient profile' });
+    next(error);
   }
 });
 
 // Get patient appointments
-router.get('/appointments', authenticateToken, async (req: Request, res: Response) => {
+router.get('/appointments', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
-    const { status, limit = 10, offset = 0 } = req.query;
+    const userId = (req as any).user?.userId;
+    const { status, limit = '10', offset = '0' } = req.query;
+    const db = getDatabase();
 
     const whereClause: any = { patientId: userId };
     if (status) {
-      const st = String(status).toUpperCase() as keyof typeof AppointmentStatus;
-      if (AppointmentStatus[st]) whereClause.status = AppointmentStatus[st];
+      const st = String(status).toUpperCase();
+      const validStatuses = ['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
+      if (validStatuses.includes(st)) {
+        whereClause.status = st;
+      }
     }
 
-    const appointments = await prisma.appointment.findMany({
+    const appointments = await db.appointment.findMany({
       where: whereClause,
       include: {
         doctor: {
@@ -108,12 +99,12 @@ router.get('/appointments', authenticateToken, async (req: Request, res: Respons
       skip: parseInt(offset as string)
     });
 
-    const total = await prisma.appointment.count({
+    const total = await db.appointment.count({
       where: whereClause
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         appointments,
         total,
@@ -123,17 +114,17 @@ router.get('/appointments', authenticateToken, async (req: Request, res: Respons
     });
 
   } catch (error) {
-    logger.error('Failed to get patient appointments:', error);
-    res.status(500).json({ error: 'Failed to get patient appointments' });
+    next(error);
   }
 });
 
 // Get medical records
-router.get('/medical-records', authenticateToken, async (req: Request, res: Response) => {
+router.get('/medical-records', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
+    const db = getDatabase();
 
-    const medicalRecords = await prisma.medicalRecord.findMany({
+    const medicalRecords = await db.medicalRecord.findMany({
       where: { patientId: userId },
       include: {
         doctor: {
@@ -146,22 +137,22 @@ router.get('/medical-records', authenticateToken, async (req: Request, res: Resp
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: medicalRecords
     });
 
   } catch (error) {
-    logger.error('Failed to get medical records:', error);
-    res.status(500).json({ error: 'Failed to get medical records' });
+    next(error);
   }
 });
 
 // Get prescriptions
-router.get('/prescriptions', authenticateToken, async (req: Request, res: Response) => {
+router.get('/prescriptions', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
+    const db = getDatabase();
 
-    const prescriptions = await prisma.prescription.findMany({
+    const prescriptions = await db.prescription.findMany({
       where: { medicalRecord: { patientId: userId } },
       include: {
         medicalRecord: {
@@ -174,36 +165,35 @@ router.get('/prescriptions', authenticateToken, async (req: Request, res: Respon
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: prescriptions
     });
 
   } catch (error) {
-    logger.error('Failed to get prescriptions:', error);
-    res.status(500).json({ error: 'Failed to get prescriptions' });
+    next(error);
   }
 });
 
 // Get health insights
-router.get('/health-insights', authenticateToken, async (req: Request, res: Response) => {
+router.get('/health-insights', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
-    const { limit = 5 } = req.query;
+    const userId = (req as any).user?.userId;
+    const { limit = '5' } = req.query;
+    const db = getDatabase();
 
-    const insights = await prisma.healthInsight.findMany({
+    const insights = await db.healthInsight.findMany({
       where: { patientId: userId },
       orderBy: { generatedAt: 'desc' },
       take: parseInt(limit as string)
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: { insights }
     });
 
   } catch (error) {
-    logger.error('Failed to get health insights:', error);
-    res.status(500).json({ error: 'Failed to get health insights' });
+    next(error);
   }
 });
 

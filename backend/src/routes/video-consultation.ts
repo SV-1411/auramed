@@ -2,13 +2,15 @@ import express, { Request, Response } from 'express';
 import { PrismaClient, VideoConsultationStatus } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { logger } from '../utils/logger';
+import { createError } from '../middleware/errorHandler';
+import { NextFunction } from 'express';
 import crypto from 'crypto';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
 // Get available doctors for video consultation
-router.get('/doctors/available', authenticateToken, async (req, res) => {
+router.get('/doctors/available', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     // In a real implementation, you'd check doctor availability
     // For now, return mock available doctors
@@ -46,25 +48,27 @@ router.get('/doctors/available', authenticateToken, async (req, res) => {
     ];
 
     res.json({
-      success: true,
+      status: 'success',
       data: { doctors: availableDoctors },
       count: availableDoctors.length
     });
 
   } catch (error) {
-    logger.error('Failed to get available doctors:', error);
-    res.status(500).json({ error: 'Failed to get available doctors' });
+    next(error);
   }
 });
 
 // Create instant video consultation
-router.post('/instant', authenticateToken, async (req, res) => {
+router.post('/instant', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { doctorId, type = 'VIDEO', symptoms = [], notes } = req.body;
-    const patientId = req.user?.id;
-
-    if (!patientId) return res.status(401).json({ error: 'Unauthorized' });
-    if (!doctorId) return res.status(400).json({ error: 'Doctor ID is required' });
+    const patientId = (req as any).user?.userId;
+    if (!patientId) {
+      throw createError('Unauthorized', 401);
+    }
+    if (!doctorId) {
+      throw createError('Doctor ID is required', 400);
+    }
 
     // Create appointment first
     const appointment = await prisma.appointment.create({
@@ -99,12 +103,8 @@ router.post('/instant', authenticateToken, async (req, res) => {
       }
     });
 
-    // In a real implementation, you'd send notifications here
-    // sendNotificationToDoctor(doctorId, videoConsultation);
-    // sendNotificationToPatient(patientId, videoConsultation);
-
     res.json({
-      success: true,
+      status: 'success',
       data: {
         room: {
           id: videoConsultation.id,
@@ -120,18 +120,18 @@ router.post('/instant', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Failed to create instant consultation:', error);
-    res.status(500).json({ error: 'Failed to create consultation' });
+    next(error);
   }
 });
 
 // Join video consultation room
-router.post('/join', authenticateToken, async (req, res) => {
+router.post('/join', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { roomName, userId } = req.body;
-    const currentUserId = req.user?.id;
-
-    if (!currentUserId) return res.status(401).json({ error: 'Unauthorized' });
+    const { roomName } = req.body;
+    const currentUserId = (req as any).user?.userId;
+    if (!currentUserId) {
+      throw createError('Unauthorized', 401);
+    }
 
     // Find the video consultation
     const videoConsultation = await prisma.videoConsultation.findUnique({
@@ -140,12 +140,12 @@ router.post('/join', authenticateToken, async (req, res) => {
     });
 
     if (!videoConsultation) {
-      return res.status(404).json({ error: 'Consultation room not found' });
+      throw createError('Consultation room not found', 404);
     }
 
     // Verify user has access to this room
     if (videoConsultation.patientId !== currentUserId && videoConsultation.doctorId !== currentUserId) {
-      return res.status(403).json({ error: 'Access denied to this consultation' });
+      throw createError('Access denied to this consultation', 403);
     }
 
     // Update participant status
@@ -168,7 +168,7 @@ router.post('/join', authenticateToken, async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: {
         consultation: {
           id: updatedConsultation.id,
@@ -183,18 +183,18 @@ router.post('/join', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Failed to join consultation room:', error);
-    res.status(500).json({ error: 'Failed to join consultation' });
+    next(error);
   }
 });
 
 // End video consultation
-router.put('/:consultationId/end', authenticateToken, async (req, res) => {
+router.put('/:consultationId/end', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { consultationId } = req.params;
-    const userId = req.user?.id;
-
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      throw createError('Unauthorized', 401);
+    }
 
     const videoConsultation = await prisma.videoConsultation.findUnique({
       where: { id: consultationId },
@@ -202,12 +202,12 @@ router.put('/:consultationId/end', authenticateToken, async (req, res) => {
     });
 
     if (!videoConsultation) {
-      return res.status(404).json({ error: 'Consultation not found' });
+      throw createError('Consultation not found', 404);
     }
 
     // Verify user has permission to end this consultation
     if (videoConsultation.patientId !== userId && videoConsultation.doctorId !== userId) {
-      return res.status(403).json({ error: 'Permission denied' });
+      throw createError('Permission denied', 403);
     }
 
     // End the video consultation
@@ -226,22 +226,23 @@ router.put('/:consultationId/end', authenticateToken, async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: { consultation: endedConsultation },
       message: 'Consultation ended successfully'
     });
 
   } catch (error) {
-    logger.error('Failed to end consultation:', error);
-    res.status(500).json({ error: 'Failed to end consultation' });
+    next(error);
   }
 });
 
 // Get consultation history
-router.get('/history', authenticateToken, async (req, res) => {
+router.get('/history', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      throw createError('Unauthorized', 401);
+    }
 
     const { limit = 10 } = req.query;
 
@@ -265,22 +266,23 @@ router.get('/history', authenticateToken, async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: { consultations },
       count: consultations.length
     });
 
   } catch (error) {
-    logger.error('Failed to get consultation history:', error);
-    res.status(500).json({ error: 'Failed to get consultation history' });
+    next(error);
   }
 });
 
 // Get active consultation for user
-router.get('/active', authenticateToken, async (req, res) => {
+router.get('/active', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      throw createError('Unauthorized', 401);
+    }
 
     const activeConsultation = await prisma.videoConsultation.findFirst({
       where: {
@@ -302,30 +304,30 @@ router.get('/active', authenticateToken, async (req, res) => {
 
     if (!activeConsultation) {
       return res.json({
-        success: true,
+        status: 'success',
         data: { consultation: null },
         message: 'No active consultation found'
       });
     }
 
     res.json({
-      success: true,
+      status: 'success',
       data: { consultation: activeConsultation }
     });
 
   } catch (error) {
-    logger.error('Failed to get active consultation:', error);
-    res.status(500).json({ error: 'Failed to get active consultation' });
+    next(error);
   }
 });
 
 // WebRTC Signaling endpoints (for peer-to-peer connection)
-router.post('/signal', authenticateToken, async (req, res) => {
+router.post('/signal', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { roomId, signalType, signalData, targetUserId } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      throw createError('Unauthorized', 401);
+    }
 
     // Verify user has access to this room
     const consultation = await prisma.videoConsultation.findUnique({
@@ -333,11 +335,11 @@ router.post('/signal', authenticateToken, async (req, res) => {
     });
 
     if (!consultation) {
-      return res.status(404).json({ error: 'Consultation room not found' });
+      throw createError('Consultation room not found', 404);
     }
 
     if (consultation.patientId !== userId && consultation.doctorId !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
+      throw createError('Access denied', 403);
     }
 
     // In a real implementation, you'd use WebSocket/Socket.io for signaling
@@ -345,7 +347,7 @@ router.post('/signal', authenticateToken, async (req, res) => {
     logger.info(`WebRTC signal received: ${signalType} in room ${roomId} from user ${userId}`);
 
     res.json({
-      success: true,
+      status: 'success',
       message: 'Signal processed successfully',
       data: {
         signalType,
@@ -355,13 +357,12 @@ router.post('/signal', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('WebRTC signaling error:', error);
-    res.status(500).json({ error: 'Signaling failed' });
+    next(error);
   }
 });
 
 // Get ICE servers for WebRTC
-router.get('/ice-servers', authenticateToken, async (req, res) => {
+router.get('/ice-servers', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     // In production, you'd get these from a TURN/STUN server provider
     // For demo purposes, using public STUN servers
@@ -372,13 +373,12 @@ router.get('/ice-servers', authenticateToken, async (req, res) => {
     ];
 
     res.json({
-      success: true,
+      status: 'success',
       data: { iceServers }
     });
 
   } catch (error) {
-    logger.error('Failed to get ICE servers:', error);
-    res.status(500).json({ error: 'Failed to get ICE servers' });
+    next(error);
   }
 });
 

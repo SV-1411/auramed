@@ -19,7 +19,7 @@ router.post('/analyze-symptoms', authenticateToken, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      throw createError('Validation failed', 400);
     }
 
     const patientId = (req as any).user.userId;
@@ -64,7 +64,7 @@ router.post('/book', authenticateToken, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      throw createError('Validation failed', 400);
     }
 
     const patientId = (req as any).user.userId;
@@ -99,7 +99,7 @@ router.get('/appointment/:appointmentId/profiles', authenticateToken, async (req
     // Verify user has access to this appointment
     const appointment = await aiAppointmentService.getAppointmentById(appointmentId);
     if (!appointment || (appointment.patientId !== userId && appointment.doctorId !== userId)) {
-      return res.status(404).json({ error: 'Appointment not found or access denied' });
+      throw createError('Appointment not found or access denied', 404);
     }
 
     const profiles = await aiAppointmentService.getAIProfiles(appointmentId, userId);

@@ -27,7 +27,7 @@ router.get('/', authenticateToken, async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: { insights },
       count: insights.length
     });
@@ -62,7 +62,7 @@ router.get('/metrics', authenticateToken, async (req, res) => {
     const metrics = generatePredictiveMetrics(medicalRecords, appointments);
 
     res.json({
-      success: true,
+      status: 'success',
       data: { metrics }
     });
 
@@ -102,7 +102,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
     }
 
     res.json({
-      success: true,
+      status: 'success',
       data: { insights: savedInsights },
       message: `${savedInsights.length} health insights generated`
     });
@@ -138,7 +138,7 @@ router.put('/:insightId/read', authenticateToken, async (req, res) => {
     });
 
     res.json({
-      success: true,
+      status: 'success',
       data: { insight: updatedInsight },
       message: 'Insight marked as read'
     });
@@ -158,7 +158,7 @@ router.get('/regional-trends', authenticateToken, async (req, res) => {
     const trends = generateMockRegionalTrends(region as string);
 
     res.json({
-      success: true,
+      status: 'success',
       data: { trends, region }
     });
 
@@ -523,7 +523,7 @@ router.get('/metrics', authenticateToken, async (req, res) => {
     };
 
     res.json({
-      success: true,
+      status: 'success',
       data: { metrics }
     });
 

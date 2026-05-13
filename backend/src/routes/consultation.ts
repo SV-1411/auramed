@@ -14,7 +14,7 @@ router.post('/', authenticateToken, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      throw createError('Validation failed', 400);
     }
 
     const userId = (req as any).user.userId;
@@ -23,12 +23,12 @@ router.post('/', authenticateToken, [
     // Get appointment to determine patient and doctor
     const appointment = await consultationService.getAppointmentById(appointmentId);
     if (!appointment) {
-      return res.status(404).json({ error: 'Appointment not found' });
+      throw createError('Appointment not found', 404);
     }
 
     // Verify user is part of this appointment
     if (appointment.patientId !== userId && appointment.doctorId !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
+      throw createError('Access denied', 403);
     }
 
     const consultation = await consultationService.createConsultation(
@@ -76,7 +76,7 @@ router.post('/:consultationId/messages', authenticateToken, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      throw createError('Validation failed', 400);
     }
 
     const consultationId = req.params.consultationId;
@@ -130,7 +130,7 @@ router.get('/:consultationId/summary', authenticateToken, async (req: Request, r
     const summary = await consultationService.getConsultationSummary(consultationId, userId);
 
     if (!summary) {
-      return res.status(404).json({ error: 'Summary not found' });
+      throw createError('Summary not found', 404);
     }
 
     res.json({
